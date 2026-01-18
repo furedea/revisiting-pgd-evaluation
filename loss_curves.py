@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PGD loss/correctness visualization (MNIST/CIFAR10, 1..5 panels) with optional
 DeepFool init.
