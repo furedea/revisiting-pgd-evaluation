@@ -1,6 +1,11 @@
 containers/*.sif
+containers/*.swp
+!containers/.gitkeep
+
 outputs/**
-third_party/**
+!outputs/.gitkeep
+model_src/**
+!model_src/.gitkeep
 
 __pycache__/
 *.py[cod]
