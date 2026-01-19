@@ -429,78 +429,6 @@ def deepfool_single_target(
     return x.astype(np.float32)
 
 
-def multi_deepfool_init_points(
-    sess: tf.compat.v1.Session,
-    ops: ModelOps,
-    x0: np.ndarray,
-    top_k: int,
-    max_iter: int,
-    overshoot: float,
-    clip_min: float,
-    clip_max: float,
-) -> Tuple[np.ndarray, ...]:
-    """Multi-DeepFool with multiple target classes (top-K closest decision boundaries).
-
-    Returns tuple of (top_k,) adversarial examples, one per target class.
-    """
-    x = x0.astype(np.float32).copy()
-    logits0 = sess.run(ops.logits, feed_dict={ops.x_ph: x})
-    start_label = int(np.argmax(logits0[0]))
-    num_classes = int(ops.logits.shape[-1])
-
-    LOGGER.info(
-        f"[multi_deepfool] start label={start_label} top_k={top_k} "
-        f"max_iter={int(max_iter)} overshoot={float(overshoot)}"
-    )
-
-    # Collect initial perturbations for all target classes
-    grads_all = sess.run(ops.grads_all_op, feed_dict={ops.x_ph: x})[0]
-    f = logits0[0] - logits0[0, start_label]
-
-    # Compute distance to each target class
-    target_distances = []
-    for target in range(num_classes):
-        if target == start_label:
-            continue
-        r_flat, r_norm = compute_perturbation_to_target(f, grads_all, start_label, target)
-        target_distances.append((r_norm, target, r_flat))
-
-    # Sort by distance and take top K
-    target_distances.sort(key=lambda x: x[0])
-    k_actual = min(int(top_k), len(target_distances))
-
-    if k_actual < int(top_k):
-        raise ValueError(
-            f"Not enough target classes: requested {top_k}, "
-            f"but only {k_actual} available (num_classes={num_classes})"
-        )
-
-    LOGGER.info(f"[multi_deepfool] selecting {k_actual} closest targets")
-
-    # Generate one adversarial example per target
-    x_advs = []
-    for idx in range(k_actual):
-        _, target_class, initial_r = target_distances[idx]
-
-        LOGGER.info(f"[multi_deepfool] target {idx+1}/{k_actual}: class={target_class}")
-
-        # Run DeepFool targeting this specific class
-        x_adv = deepfool_single_target(
-            sess=sess,
-            ops=ops,
-            x0=x0,
-            target_class=target_class,
-            start_label=start_label,
-            max_iter=max_iter,
-            overshoot=overshoot,
-            clip_min=clip_min,
-            clip_max=clip_max,
-        )
-        x_advs.append(x_adv)
-
-    return tuple(x_advs)
-
-
 def multi_deepfool_with_trace(
     sess: tf.compat.v1.Session,
     ops: ModelOps,
@@ -509,10 +437,7 @@ def multi_deepfool_with_trace(
     top_k: int,
     max_iter: int,
     overshoot: float,
-    clip_min: float,
-    clip_max: float,
     eps: float,
-    do_clip: bool,
 ) -> Tuple[Tuple[np.ndarray, ...], np.ndarray, np.ndarray]:
     """Multi-DeepFool with trajectory recording.
 
@@ -561,7 +486,7 @@ def multi_deepfool_with_trace(
     losses = np.zeros((k_actual, int(max_iter) + 1), dtype=np.float32)
     preds = np.zeros((k_actual, int(max_iter) + 1), dtype=np.int64)
 
-    # Record initial state (step 0 = x_nat)
+    # Record initial state (iter 0 = x_nat)
     l0, p0 = sess.run(
         [ops.per_ex_loss_op, ops.y_pred_op],
         feed_dict={ops.x_ph: x0, ops.y_ph: y_nat},
@@ -578,10 +503,8 @@ def multi_deepfool_with_trace(
 
         # DeepFool iterations with trajectory recording
         x_curr = x0.astype(np.float32).copy()
-        curr_label = start_label
 
         for i in range(int(max_iter)):
-            # Compute gradients and logits
             logits = sess.run(ops.logits, feed_dict={ops.x_ph: x_curr})
             current_pred = int(np.argmax(logits[0]))
 
@@ -596,11 +519,10 @@ def multi_deepfool_with_trace(
 
                 r = r_flat.reshape(x_curr.shape[1:])
                 x_curr = x_curr + (1.0 + float(overshoot)) * r[np.newaxis, ...]
-                x_curr = np.clip(x_curr, float(clip_min), float(clip_max)).astype(np.float32)
+                x_curr = clip_to_unit_interval(x_curr)
 
             # Project to eps-ball and record
-            x_proj = project_linf(x_curr, x0, float(eps))
-            x_proj = clip_to_unit_interval(x_proj) if do_clip else x_proj
+            x_proj = clip_to_unit_interval(project_linf(x_curr, x0, float(eps)))
 
             lt, pt = sess.run(
                 [ops.per_ex_loss_op, ops.y_pred_op],
@@ -610,8 +532,7 @@ def multi_deepfool_with_trace(
             preds[idx, i + 1] = int(pt[0])
 
         # Final point (projected to eps-ball)
-        x_final = project_linf(x_curr, x0, float(eps))
-        x_final = clip_to_unit_interval(x_final) if do_clip else x_final
+        x_final = clip_to_unit_interval(project_linf(x_curr, x0, float(eps)))
         x_advs.append(x_final)
 
     return tuple(x_advs), losses, preds
@@ -624,39 +545,38 @@ def run_multi_deepfool_init_pgd(
     y_nat: np.ndarray,
     eps: float,
     alpha: float,
-    total_steps: int,
+    total_iter: int,
     num_restarts: int,
     df_max_iter: int,
     df_overshoot: float,
     seed: int,
-    do_clip: bool,
 ) -> PGDBatchResult:
     """Run multi_deepfool followed by PGD.
 
-    total_steps is the total number of iterations:
-    - step 0: x_nat (initial point)
-    - step 1 to df_max_iter: multi_deepfool iterations
-    - step df_max_iter+1 to total_steps: PGD iterations
+    total_iter is the total number of iterations:
+    - iter 0: x_nat (initial point)
+    - iter 1 to df_max_iter: multi_deepfool iterations
+    - iter df_max_iter+1 to total_iter: PGD iterations
 
-    Returns PGDBatchResult with losses/preds of shape (num_restarts, total_steps+1).
+    Returns PGDBatchResult with losses/preds of shape (num_restarts, total_iter+1).
     """
     restarts = int(num_restarts)
     df_iter = int(df_max_iter)
-    pgd_steps = int(total_steps) - df_iter
+    pgd_iter = int(total_iter) - df_iter
 
-    if pgd_steps < 0:
+    if pgd_iter < 0:
         raise ValueError(
-            f"total_steps ({total_steps}) must be >= df_max_iter ({df_max_iter})"
+            f"total_iter ({total_iter}) must be >= df_max_iter ({df_max_iter})"
         )
 
     LOGGER.info(
         f"[multi_deepfool_pgd] restarts={restarts} df_iter={df_iter} "
-        f"pgd_steps={pgd_steps} total_steps={total_steps}"
+        f"pgd_iter={pgd_iter} total_iter={total_iter}"
     )
 
     # Initialize arrays for full trajectory
-    losses = np.zeros((restarts, int(total_steps) + 1), dtype=np.float32)
-    preds = np.zeros((restarts, int(total_steps) + 1), dtype=np.int64)
+    losses = np.zeros((restarts, int(total_iter) + 1), dtype=np.float32)
+    preds = np.zeros((restarts, int(total_iter) + 1), dtype=np.int64)
 
     # Run multi_deepfool with trace
     x_advs, df_losses, df_preds = multi_deepfool_with_trace(
@@ -667,13 +587,10 @@ def run_multi_deepfool_init_pgd(
         top_k=restarts,
         max_iter=df_iter,
         overshoot=float(df_overshoot),
-        clip_min=0.0,
-        clip_max=1.0,
         eps=float(eps),
-        do_clip=bool(do_clip),
     )
 
-    # Copy multi_deepfool trajectory (step 0 to df_max_iter)
+    # Copy multi_deepfool trajectory (iter 0 to df_max_iter)
     losses[:, : df_iter + 1] = df_losses
     preds[:, : df_iter + 1] = df_preds
 
@@ -685,11 +602,10 @@ def run_multi_deepfool_init_pgd(
     x_adv = np.concatenate([x.astype(np.float32) for x in x_advs], axis=0)
 
     # Run PGD from multi_deepfool endpoints
-    for t in tqdm(range(1, pgd_steps + 1), desc="PGD", unit="step", leave=False):
+    for t in tqdm(range(1, pgd_iter + 1), desc="PGD", unit="iter", leave=False):
         grad = sess.run(ops.grad_op, feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch})
         x_adv = x_adv + float(alpha) * np.sign(grad).astype(np.float32)
-        x_adv = project_linf(x_adv, x_nat_batch, float(eps))
-        x_adv = clip_to_unit_interval(x_adv) if do_clip else x_adv
+        x_adv = clip_to_unit_interval(project_linf(x_adv, x_nat_batch, float(eps)))
 
         lt, pt = sess.run(
             [ops.per_ex_loss_op, ops.y_pred_op],
@@ -740,37 +656,14 @@ def find_correct_indices(
 # ============================================================
 # PGD
 # ============================================================
-def build_initial_points(
+def build_random_init(
     rng: np.random.RandomState,
-    init: str,
-    x_init: Optional[Tuple[np.ndarray, ...]],
     x_nat_batch: np.ndarray,
     eps: float,
-    do_clip: bool,
 ) -> np.ndarray:
-    if init == "multi_deepfool":
-        if x_init is None:
-            raise ValueError("init='multi_deepfool' requires x_init (tuple of init points).")
-        if not isinstance(x_init, tuple):
-            raise TypeError("init='multi_deepfool' requires x_init to be a tuple.")
-
-        num_restarts = x_nat_batch.shape[0]
-        num_init_points = len(x_init)
-
-        # Cycle through init points to fill all restarts
-        x_adv_list = []
-        for r in range(num_restarts):
-            idx = r % num_init_points
-            x_adv_list.append(x_init[idx].astype(np.float32))
-
-        x_adv = np.concatenate(x_adv_list, axis=0)
-        x_adv = project_linf(x_adv, x_nat_batch, float(eps))
-        return clip_to_unit_interval(x_adv) if do_clip else x_adv
-
-    # random init
+    """Build random initial points within eps-ball."""
     noise = rng.uniform(low=-eps, high=eps, size=x_nat_batch.shape).astype(np.float32)
-    x_adv = project_linf(x_nat_batch + noise, x_nat_batch, float(eps))
-    return clip_to_unit_interval(x_adv) if do_clip else x_adv
+    return clip_to_unit_interval(project_linf(x_nat_batch + noise, x_nat_batch, float(eps)))
 
 
 def run_pgd_batch(
@@ -780,31 +673,22 @@ def run_pgd_batch(
     y_nat: np.ndarray,
     eps: float,
     alpha: float,
-    steps: int,
+    num_iter: int,
     num_restarts: int,
     seed: int,
-    do_clip: bool,
-    init: str,
-    x_init: Optional[Tuple[np.ndarray, ...]],
 ) -> PGDBatchResult:
+    """Run PGD with random initialization."""
     rng = np.random.RandomState(int(seed))
     restarts = int(num_restarts)
-    total_steps = int(steps)
+    total_iter = int(num_iter)
 
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
     x_nat_batch = np.repeat(x_nat.astype(np.float32), restarts, axis=0)
 
-    losses = np.zeros((restarts, total_steps + 1), dtype=np.float32)
-    preds = np.zeros((restarts, total_steps + 1), dtype=np.int64)
+    losses = np.zeros((restarts, total_iter + 1), dtype=np.float32)
+    preds = np.zeros((restarts, total_iter + 1), dtype=np.int64)
 
-    x_adv = build_initial_points(
-        rng=rng,
-        init=str(init),
-        x_init=x_init,
-        x_nat_batch=x_nat_batch,
-        eps=float(eps),
-        do_clip=bool(do_clip),
-    )
+    x_adv = build_random_init(rng=rng, x_nat_batch=x_nat_batch, eps=float(eps))
 
     l0, p0 = sess.run(
         [ops.per_ex_loss_op, ops.y_pred_op],
@@ -813,11 +697,10 @@ def run_pgd_batch(
     losses[:, 0] = l0.astype(np.float32)
     preds[:, 0] = p0.astype(np.int64)
 
-    for t in tqdm(range(1, total_steps + 1), desc="PGD", unit="step", leave=False):
+    for t in tqdm(range(1, total_iter + 1), desc="PGD", unit="iter", leave=False):
         grad = sess.run(ops.grad_op, feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch})
         x_adv = x_adv + float(alpha) * np.sign(grad).astype(np.float32)
-        x_adv = project_linf(x_adv, x_nat_batch, float(eps))
-        x_adv = clip_to_unit_interval(x_adv) if do_clip else x_adv
+        x_adv = clip_to_unit_interval(project_linf(x_adv, x_nat_batch, float(eps)))
 
         lt, pt = sess.run(
             [ops.per_ex_loss_op, ops.y_pred_op],
@@ -916,7 +799,6 @@ def plot_panels(
     panels: Tuple[ExamplePanel, ...],
     out_png: str,
     title: str,
-    alpha_line: float,
     init_sanity_plot: bool,
     eps: float,
 ) -> None:
@@ -969,12 +851,12 @@ def plot_panels(
     for col, panel in enumerate(panels):
         losses = panel.pgd.losses
         corrects = panel.pgd.corrects
-        restarts, steps_plus1 = losses.shape
-        xs = np.arange(steps_plus1)
+        restarts, iter_plus1 = losses.shape
+        xs = np.arange(iter_plus1)
 
         ax1 = fig.add_subplot(gs[0, col])
         for r in range(restarts):
-            ax1.plot(xs, losses[r], linewidth=1, alpha=float(alpha_line))
+            ax1.plot(xs, losses[r], linewidth=1, alpha=0.9)
         ax1.set_xlabel("Iterations")
         ax1.set_ylabel("Cross-entropy Loss" if col == 0 else "")
         ax1.tick_params(labelbottom=True)
@@ -1224,28 +1106,26 @@ def plot_panels(
 def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("--dataset", choices=["mnist", "cifar10"], required=True)
     ap.add_argument("--model_src_dir", required=True)
     ap.add_argument("--ckpt_dir", required=True)
     ap.add_argument("--out_dir", required=True)
 
-    ap.add_argument("--start_idx", type=int, default=0)
-    ap.add_argument("--n_examples", type=int, default=1)
-    ap.add_argument("--max_tries", type=int, default=20000)
-
+    ap.add_argument("--dataset", choices=["mnist", "cifar10"], required=True)
+    ap.add_argument("--init", choices=["random", "multi_deepfool"], default="random")
     ap.add_argument("--seed", type=int, default=0)
+
+    ap.add_argument("--n_examples", type=int, default=1)
+
+    ap.add_argument("--num_restarts", type=int, default=20)
+    ap.add_argument("--total_iter", type=int, default=100)
+    ap.add_argument("--df_max_iter", type=int, default=50)
+
+    ap.add_argument("--start_idx", type=int, default=0) # テストデータ変更の場合のみ使用
+    ap.add_argument("--max_tries", type=int, default=20000) # 正分類データ探索範囲変更の場合のみ使用
+
     ap.add_argument("--epsilon", type=float, required=True)
     ap.add_argument("--alpha", type=float, required=True)
-    ap.add_argument("--steps", type=int, default=100)
-    ap.add_argument("--num_restarts", type=int, default=20)
 
-    ap.add_argument("--no_clip", action="store_true") # TODO: いる？
-    ap.add_argument("--tag", default="naturally_trained")
-    ap.add_argument("--alpha_line", type=float, default=0.9)
-    ap.add_argument("--check_only", action="store_true")
-
-    ap.add_argument("--init", choices=["random", "multi_deepfool"], default="random")
-    ap.add_argument("--df_max_iter", type=int, default=50)
     ap.add_argument("--df_overshoot", type=float, default=0.02)
     ap.add_argument("--init_sanity_plot", action="store_true")
 
@@ -1264,24 +1144,30 @@ def format_indices_part(indices: Tuple[int, ...]) -> str:
     return f"idx{indices[0]}" if len(indices) == 1 else f"indices{'-'.join(str(i) for i in indices)}"
 
 
+def get_model_tag(ckpt_dir: str) -> str:
+    """Extract model tag from ckpt_dir basename (e.g., 'models/nat' -> 'nat')."""
+    return os.path.basename(os.path.normpath(ckpt_dir))
+
+
 def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
     idx_part = format_indices_part(indices)
+    tag = get_model_tag(str(args.ckpt_dir))
     df_part = (
         f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}"
         if args.init == "multi_deepfool"
         else ""
     )
-    clip_part = "_noclip" if args.no_clip else ""
 
     return (
-        f"{args.dataset}_{args.tag}_{args.init}_{idx_part}_k{args.steps}"
+        f"{args.dataset}_{tag}_{args.init}_{idx_part}_k{args.total_iter}"
         f"_eps{args.epsilon}_a{args.alpha}_r{args.num_restarts}_seed{args.seed}"
-        f"{df_part}{clip_part}"
+        f"{df_part}"
     )
 
 
 def format_title(args: argparse.Namespace) -> str:
-    return f"{args.dataset.upper()} loss curves ({args.tag}, {args.init}-init)"
+    tag = get_model_tag(str(args.ckpt_dir))
+    return f"{args.dataset.upper()} loss curves ({tag}, {args.init}-init)"
 
 
 # ============================================================
@@ -1314,19 +1200,6 @@ def load_test_data(
     return load_cifar10_float01()
 
 
-def run_check_only(
-    sess: tf.compat.v1.Session,
-    ops: ModelOps,
-    x_test: np.ndarray,
-    y_test: np.ndarray,
-    start_idx: int,
-) -> None:
-    x_nat = x_test[start_idx : start_idx + 1].astype(np.float32)
-    y_nat = y_test[start_idx : start_idx + 1].astype(np.int64)
-    log_nat_sanity(sess, ops, x_nat, y_nat)
-    LOGGER.info({"action": "exit", "reason": "check_only"})
-
-
 def run_one_example(
     args: argparse.Namespace,
     sess: tf.compat.v1.Session,
@@ -1340,12 +1213,9 @@ def run_one_example(
 
     log_nat_sanity(sess, ops, x_nat, y_nat)
 
-    do_clip = not bool(args.no_clip)
-
     x_df = None
 
     if args.init == "multi_deepfool":
-        # Run multi_deepfool + PGD with trajectory recording
         pgd = run_multi_deepfool_init_pgd(
             sess=sess,
             ops=ops,
@@ -1353,17 +1223,14 @@ def run_one_example(
             y_nat=y_nat,
             eps=float(args.epsilon),
             alpha=float(args.alpha),
-            total_steps=int(args.steps),
+            total_iter=int(args.total_iter),
             num_restarts=int(args.num_restarts),
             df_max_iter=int(args.df_max_iter),
             df_overshoot=float(args.df_overshoot),
             seed=int(args.seed),
-            do_clip=do_clip,
         )
-        # For visualization, x_df is the first restart's final point
         x_df = pgd.x_adv_final[0:1].astype(np.float32)
     else:
-        # Random init: run standard PGD
         pgd = run_pgd_batch(
             sess=sess,
             ops=ops,
@@ -1371,12 +1238,9 @@ def run_one_example(
             y_nat=y_nat,
             eps=float(args.epsilon),
             alpha=float(args.alpha),
-            steps=int(args.steps),
+            num_iter=int(args.total_iter),
             num_restarts=int(args.num_restarts),
             seed=int(args.seed),
-            do_clip=do_clip,
-            init=str(args.init),
-            x_init=None,
         )
 
     # Sanity logging (x_df and x_init for multi_deepfool case)
@@ -1460,11 +1324,10 @@ def save_all_outputs(
         f"dataset={args.dataset}\n"
         f"epsilon={args.epsilon}\n"
         f"alpha={args.alpha}\n"
-        f"steps={args.steps}\n"
+        f"total_iter={args.total_iter}\n"
         f"num_restarts={args.num_restarts}\n"
         f"seed={args.seed}\n"
         f"init={args.init}\n"
-        f"clip={not args.no_clip}\n"
         f"{df_params}\n"
     )
 
@@ -1491,7 +1354,6 @@ def render_figure(
         panels=panels,
         out_png=out_png,
         title=str(title),
-        alpha_line=float(args.alpha_line),
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "multi_deepfool"),
         eps=float(args.epsilon),
     )
@@ -1514,10 +1376,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
         restore_checkpoint(sess, saver, str(args.ckpt_dir))
         x_test, y_test = load_test_data(args, model_src_dir)
 
-        if bool(args.check_only):
-            run_check_only(sess, ops, x_test, y_test, int(args.start_idx))
-            return
-
         indices = find_correct_indices(
             sess=sess,
             ops=ops,
@@ -1529,6 +1387,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         )
         base = format_base_name(args, indices)
         title = format_title(args)
+        tag = get_model_tag(str(args.ckpt_dir))
 
         df_part = (
             f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot}"
@@ -1536,8 +1395,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             else ""
         )
         LOGGER.info(
-            f"[run] dataset={args.dataset} indices={indices} tag={args.tag} init={args.init}"
-            f" eps={args.epsilon} alpha={args.alpha} steps={args.steps} restarts={args.num_restarts}"
+            f"[run] dataset={args.dataset} indices={indices} tag={tag} init={args.init}"
+            f" eps={args.epsilon} alpha={args.alpha} total_iter={args.total_iter} restarts={args.num_restarts}"
             f" seed={args.seed}{df_part} out={args.out_dir}"
         )
 
