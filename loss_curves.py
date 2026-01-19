@@ -813,21 +813,10 @@ def plot_panels(
 
     cmap = ListedColormap(["#440154", "#FDE725"])
 
-    # ---- sanity row is shown only if at least one sample has linf_df > eps
-    has_df_over_eps = any(
-        (p.sanity is not None)
-        and (p.sanity.linf_df is not None)
-        and (float(p.sanity.linf_df) > float(eps))
-        for p in panels
-    )
-
-    # user flag + multi_deepfool + df_over_eps only
-    show_sanity_row = bool(init_sanity_plot) and bool(has_df_over_eps)
-
-    # nrows = 4 if bool(init_sanity_plot) else 3
-    # height_ratios = [3.2, 1.5, 1.6, 1.6] if nrows == 4 else [3.2, 1.5, 1.6]
-    nrows = 4 if show_sanity_row else 3
-    height_ratios = [3.2, 1.5, 1.6, 1.6] if show_sanity_row else [3.2, 1.5, 1.6]
+    # Sanity row disabled
+    show_sanity_row = False
+    nrows = 3
+    height_ratios = [3.2, 1.5, 1.6]
 
     # fig_w = 4.2 * num_panels
     fig_w = min(3.6 * num_panels, 16.0) # TODO
