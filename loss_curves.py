@@ -158,7 +158,7 @@ class InitSanityMetrics:
 class PGDBatchResult:
     """Batched PGD result for one example (R restarts)."""
 
-    __slots__ = ("losses", "preds", "corrects", "x_adv_final")
+    __slots__ = ("losses", "preds", "corrects", "x_adv_final", "x_df_endpoints")
 
     def __init__(
         self,
@@ -166,11 +166,13 @@ class PGDBatchResult:
         preds: np.ndarray,
         corrects: np.ndarray,
         x_adv_final: np.ndarray,
+        x_df_endpoints: Optional[np.ndarray] = None,
     ) -> None:
         self.losses = losses
         self.preds = preds
         self.corrects = corrects
         self.x_adv_final = x_adv_final
+        self.x_df_endpoints = x_df_endpoints
 
 
 class ExamplePanel:
@@ -598,8 +600,9 @@ def run_multi_deepfool_init_pgd(
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
     x_nat_batch = np.repeat(x_nat.astype(np.float32), restarts, axis=0)
 
-    # Stack x_advs into batch
-    x_adv = np.concatenate([x.astype(np.float32) for x in x_advs], axis=0)
+    # Stack x_advs into batch (this is DeepFool endpoint, before PGD)
+    x_df_endpoints = np.concatenate([x.astype(np.float32) for x in x_advs], axis=0)
+    x_adv = x_df_endpoints.copy()
 
     # Run PGD from multi_deepfool endpoints
     for t in tqdm(range(1, pgd_iter + 1), desc="PGD", unit="iter", leave=False):
@@ -621,6 +624,7 @@ def run_multi_deepfool_init_pgd(
         preds=preds,
         corrects=corrects,
         x_adv_final=x_adv.astype(np.float32),
+        x_df_endpoints=x_df_endpoints,
     )
 
 
@@ -834,8 +838,8 @@ def plot_panels(
         nrows=nrows,
         ncols=num_panels,
         height_ratios=height_ratios,
-        hspace=0.65 if nrows == 4 else 0.55, # 問題があれば修正
-        wspace=0.35,
+        hspace=0.65 if nrows == 4 else 0.55,
+        wspace=0.55,  # Increased from 0.35 to avoid y-axis label overlap
     )
 
     fig.legend(
@@ -1025,9 +1029,7 @@ def plot_panels(
             ax.set_xlim(0.0, x_max)
 
             ax.set_xlabel("Linf")
-            ax.set_ylabel("Cross-entropy Loss" if col == 0 else "")
-            if col > 0:
-                ax.tick_params(labelleft=False)
+            ax.set_ylabel("Cross-entropy Loss")  # Show y-label on all columns
 
             if p.sanity is None:
                 ax.set_title(f"s{col+1} (no sanity)", fontsize=11)
@@ -1258,7 +1260,7 @@ def run_one_example(
             df_overshoot=float(args.df_overshoot),
             seed=int(args.seed),
         )
-        x_df = pgd.x_adv_final[0:1].astype(np.float32)
+        x_df = pgd.x_df_endpoints[0:1].astype(np.float32)  # DeepFool endpoint
     else:
         pgd = run_pgd_batch(
             sess=sess,
