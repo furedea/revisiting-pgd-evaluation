@@ -1364,11 +1364,12 @@ def save_all_outputs(
 
     df_params = ""
     if args.init == "deepfool":
-        df_params = f"""df_max_iter={args.df_max_iter}
-df_overshoot={args.df_overshoot}
-df_jitter={args.df_jitter}
-df_project={args.df_project}
-"""
+        df_params = (
+            f"df_max_iter={args.df_max_iter}\n"
+            f"df_overshoot={args.df_overshoot}\n"
+            f"df_jitter={args.df_jitter}\n"
+            f"df_project={args.df_project}\n"
+        )
 
     content = (
         "[PARAMETERS]\n"
@@ -1381,7 +1382,7 @@ df_project={args.df_project}
         f"init={args.init}\n"
         f"clip={not args.no_clip}\n"
         f"{df_params}\n"
-"""
+    )
 
     for i, panel in enumerate(panels, start=1):
         content += format_panel_metadata(panel, i, args)
@@ -1472,3 +1473,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
