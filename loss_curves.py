@@ -839,7 +839,7 @@ def plot_panels(
         ncols=num_panels,
         height_ratios=height_ratios,
         hspace=0.65 if nrows == 4 else 0.55,
-        wspace=0.55,  # Increased from 0.35 to avoid y-axis label overlap
+        wspace=0.65,  # Increased from 0.35 to avoid y-axis label overlap
     )
 
     fig.legend(
@@ -1124,7 +1124,8 @@ def plot_panels(
 
     # Adjust margins (right margin for colorbar when multi_deepfool)
     right_margin = 0.94 if init_mode == "multi_deepfool" else 0.99
-    fig.subplots_adjust(top=0.90 if nrows == 4 else 0.88, bottom=0.11, left=0.06, right=right_margin)
+    # Increase left margin to accommodate y-axis labels on all columns
+    fig.subplots_adjust(top=0.90 if nrows == 4 else 0.88, bottom=0.11, left=0.08, right=right_margin)
     fig.savefig(out_png, dpi=200)
     plt.close(fig)
 
