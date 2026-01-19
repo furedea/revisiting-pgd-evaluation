@@ -186,6 +186,7 @@ class ExamplePanel:
         "pred_end",
         "pgd",
         "sanity",
+        "test_idx",
     )
 
     def __init__(
@@ -198,6 +199,7 @@ class ExamplePanel:
         pgd: PGDBatchResult,
         sanity: Optional[InitSanityMetrics],
         x_df: Optional[np.ndarray] = None,
+        test_idx: int = -1,
     ) -> None:
         self.x_nat = x_nat
         self.y_nat = y_nat
@@ -207,6 +209,7 @@ class ExamplePanel:
         self.pred_end = pred_end
         self.pgd = pgd
         self.sanity = sanity
+        self.test_idx = test_idx
 
 
 # ============================================================
@@ -686,25 +689,14 @@ def choose_show_restart(pgd_result: PGDBatchResult) -> int:
 # ============================================================
 # saving / plotting
 # ============================================================
-def save_panel_outputs(
+def save_panel_arrays(
     out_dir: str,
     base: str,
-    dataset: str,
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
-    metadata_dir = os.path.join(out_dir, "metadata")
     arrays_dir = os.path.join(out_dir, "arrays")
-    os.makedirs(metadata_dir, exist_ok=True)
     os.makedirs(arrays_dir, exist_ok=True)
-
-    meta_txt = os.path.join(metadata_dir, f"{base}_p{panel_index}_meta.txt")
-
-    with open(meta_txt, "w", encoding="utf-8") as f:
-        f.write(f"dataset={dataset}\n")
-        f.write(f"panel={panel_index}\n")
-        f.write(f"restart_shown={panel.show_restart}\n")
-        f.write(f"pred_end={panel.pred_end}\n")
 
     np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_losses.npy"), panel.pgd.losses)
     np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_preds.npy"), panel.pgd.preds)
@@ -713,7 +705,55 @@ def save_panel_outputs(
         panel.pgd.corrects.astype(np.uint8),
     )
 
-    LOGGER.info(f"[save] panel={int(panel_index)} meta={meta_txt}")
+
+def format_panel_metadata(panel: ExamplePanel, panel_index: int, args: argparse.Namespace) -> str:
+    """Format metadata for a single panel."""
+    losses = panel.pgd.losses
+    preds = panel.pgd.preds
+    corrects = panel.pgd.corrects
+    true_label = int(panel.y_nat.reshape(-1)[0])
+    attack_success_rate = float(np.sum(~corrects[:, -1])) / float(corrects.shape[0])
+    initial_losses = losses[:, 0]
+    final_losses = losses[:, -1]
+
+    nat_pred_line = f"nat_pred={panel.sanity.nat_pred}\n" if panel.sanity is not None else ""
+    nat_loss_line = f"nat_loss={panel.sanity.nat_loss:.6f}\n" if panel.sanity is not None else ""
+
+    content = (
+        f"[PANEL_{panel_index}]\n"
+        f"test_index={panel.test_idx}\n"
+        f"true_label={true_label}\n"
+        f"restart_shown={panel.show_restart}\n"
+        f"pred_end={panel.pred_end}\n"
+        f"{nat_pred_line}final_preds={','.join(str(int(p)) for p in preds[:, -1])}\n"
+        f"attack_success_rate={attack_success_rate:.6f}\n"
+        f"{nat_loss_line}initial_loss_min={float(np.min(initial_losses)):.6f}\n"
+        f"initial_loss_max={float(np.max(initial_losses)):.6f}\n"
+        f"initial_loss_mean={float(np.mean(initial_losses)):.6f}\n"
+        f"initial_loss_median={float(np.median(initial_losses)):.6f}\n"
+        f"final_loss_min={float(np.min(final_losses)):.6f}\n"
+        f"final_loss_max={float(np.max(final_losses)):.6f}\n"
+        f"final_loss_mean={float(np.mean(final_losses)):.6f}\n"
+        f"final_loss_median={float(np.median(final_losses)):.6f}\n"
+    )
+
+    if panel.sanity is not None and args.init == "deepfool":
+        df_lines = ""
+        if panel.sanity.df_pred is not None:
+            df_lines += f"df_pred={panel.sanity.df_pred}\n"
+        if panel.sanity.df_loss is not None:
+            df_lines += f"df_loss={panel.sanity.df_loss:.6f}\n"
+        if panel.sanity.linf_df is not None:
+            df_lines += f"linf_df={panel.sanity.linf_df:.6f}\n"
+        if panel.sanity.init_pred is not None:
+            df_lines += f"init_pred={panel.sanity.init_pred}\n"
+        if panel.sanity.init_loss is not None:
+            df_lines += f"init_loss={panel.sanity.init_loss:.6f}\n"
+        if panel.sanity.linf_init is not None:
+            df_lines += f"linf_init={panel.sanity.linf_init:.6f}\n"
+        content += df_lines
+
+    return content
 
 
 def plot_panels(
@@ -1285,6 +1325,7 @@ def run_one_example(
         pgd=pgd,
         sanity=sanity,
         x_df=x_df,
+        test_idx=int(idx),
     )
 
 
@@ -1307,14 +1348,48 @@ def save_all_outputs(
     base: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> None:
+    # Save arrays for each panel
     for i, panel in enumerate(panels, start=1):
-        save_panel_outputs(
+        save_panel_arrays(
             out_dir=str(args.out_dir),
             base=str(base),
-            dataset=str(args.dataset),
             panel_index=int(i),
             panel=panel,
         )
+
+    # Save unified metadata file
+    metadata_dir = os.path.join(args.out_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
+    meta_txt = os.path.join(metadata_dir, f"{base}_meta.txt")
+
+    df_params = ""
+    if args.init == "deepfool":
+        df_params = f"""df_max_iter={args.df_max_iter}
+df_overshoot={args.df_overshoot}
+df_jitter={args.df_jitter}
+df_project={args.df_project}
+"""
+
+    content = (
+        "[PARAMETERS]\n"
+        f"dataset={args.dataset}\n"
+        f"epsilon={args.epsilon}\n"
+        f"alpha={args.alpha}\n"
+        f"steps={args.steps}\n"
+        f"num_restarts={args.num_restarts}\n"
+        f"seed={args.seed}\n"
+        f"init={args.init}\n"
+        f"clip={not args.no_clip}\n"
+        f"{df_params}\n"
+"""
+
+    for i, panel in enumerate(panels, start=1):
+        content += format_panel_metadata(panel, i, args)
+
+    with open(meta_txt, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    LOGGER.info(f"[save] metadata={meta_txt}")
 
 
 def render_figure(
