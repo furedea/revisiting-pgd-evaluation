@@ -690,9 +690,12 @@ def save_panel_outputs(
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
-    os.makedirs(out_dir, exist_ok=True)
+    metadata_dir = os.path.join(out_dir, "metadata")
+    arrays_dir = os.path.join(out_dir, "arrays")
+    os.makedirs(metadata_dir, exist_ok=True)
+    os.makedirs(arrays_dir, exist_ok=True)
 
-    meta_txt = os.path.join(out_dir, f"{base}_p{panel_index}_meta.txt")
+    meta_txt = os.path.join(metadata_dir, f"{base}_p{panel_index}_meta.txt")
 
     with open(meta_txt, "w", encoding="utf-8") as f:
         f.write(f"dataset={dataset}\n")
@@ -700,10 +703,10 @@ def save_panel_outputs(
         f.write(f"restart_shown={panel.show_restart}\n")
         f.write(f"pred_end={panel.pred_end}\n")
 
-    np.save(os.path.join(out_dir, f"{base}_p{panel_index}_losses.npy"), panel.pgd.losses)
-    np.save(os.path.join(out_dir, f"{base}_p{panel_index}_preds.npy"), panel.pgd.preds)
+    np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_losses.npy"), panel.pgd.losses)
+    np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_preds.npy"), panel.pgd.preds)
     np.save(
-        os.path.join(out_dir, f"{base}_p{panel_index}_corrects.npy"),
+        os.path.join(arrays_dir, f"{base}_p{panel_index}_corrects.npy"),
         panel.pgd.corrects.astype(np.uint8),
     )
 
@@ -1293,7 +1296,9 @@ def render_figure(
     title: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> str:
-    out_png = os.path.join(args.out_dir, f"{base}.png")
+    figures_dir = os.path.join(args.out_dir, "figures")
+    os.makedirs(figures_dir, exist_ok=True)
+    out_png = os.path.join(figures_dir, f"{base}.png")
     plot_panels(
         dataset=str(args.dataset),
         panels=panels,
