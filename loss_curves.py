@@ -801,6 +801,7 @@ def plot_panels(
     title: str,
     init_sanity_plot: bool,
     eps: float,
+    init_mode: str = "random",
 ) -> None:
     num_panels = int(len(panels))
     if num_panels < 1 or num_panels > 5:
@@ -855,8 +856,19 @@ def plot_panels(
         xs = np.arange(iter_plus1)
 
         ax1 = fig.add_subplot(gs[0, col])
+
+        # Color gradient for multi_deepfool init (closer boundary = warmer color)
+        use_color_gradient = init_mode == "multi_deepfool" and restarts > 1
+        if use_color_gradient:
+            cmap_loss = plt.cm.get_cmap("coolwarm_r")
+            norm_loss = plt.Normalize(0, restarts - 1)
+
         for r in range(restarts):
-            ax1.plot(xs, losses[r], linewidth=1, alpha=0.9)
+            if use_color_gradient:
+                color = cmap_loss(norm_loss(r))
+                ax1.plot(xs, losses[r], linewidth=1, alpha=0.9, color=color)
+            else:
+                ax1.plot(xs, losses[r], linewidth=1, alpha=0.9)
         ax1.set_xlabel("Iterations")
         ax1.set_ylabel("Cross-entropy Loss" if col == 0 else "")
         ax1.tick_params(labelbottom=True)
@@ -1013,7 +1025,9 @@ def plot_panels(
             ax.set_xlim(0.0, x_max)
 
             ax.set_xlabel("Linf")
-            ax.set_ylabel("Cross-entropy Loss")
+            ax.set_ylabel("Cross-entropy Loss" if col == 0 else "")
+            if col > 0:
+                ax.tick_params(labelleft=False)
 
             if p.sanity is None:
                 ax.set_title(f"s{col+1} (no sanity)", fontsize=11)
@@ -1093,7 +1107,22 @@ def plot_panels(
         # Give room for the bottom legend
         # (later you already call fig.subplots_adjust; update bottom there too)
 
-    fig.subplots_adjust(top=0.90 if nrows == 4 else 0.88, bottom=0.11, left=0.06, right=0.99)
+    # Add colorbar for multi_deepfool init (distance rank visualization)
+    if init_mode == "multi_deepfool" and num_panels > 0:
+        restarts = panels[0].pgd.losses.shape[0]
+        if restarts > 1:
+            cmap_loss = plt.cm.get_cmap("coolwarm_r")
+            norm_loss = plt.Normalize(0, restarts - 1)
+            sm = plt.cm.ScalarMappable(cmap=cmap_loss, norm=norm_loss)
+            sm.set_array([])
+            cbar_ax = fig.add_axes([0.96, 0.55, 0.012, 0.30])
+            cbar = fig.colorbar(sm, cax=cbar_ax)
+            cbar.set_label("Distance rank\n(0=closest)", fontsize=9)
+            cbar.ax.tick_params(labelsize=8)
+
+    # Adjust margins (right margin for colorbar when multi_deepfool)
+    right_margin = 0.94 if init_mode == "multi_deepfool" else 0.99
+    fig.subplots_adjust(top=0.90 if nrows == 4 else 0.88, bottom=0.11, left=0.06, right=right_margin)
     fig.savefig(out_png, dpi=200)
     plt.close(fig)
 
@@ -1356,6 +1385,7 @@ def render_figure(
         title=str(title),
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "multi_deepfool"),
         eps=float(args.epsilon),
+        init_mode=str(args.init),
     )
     return out_png
 
