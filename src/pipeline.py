@@ -21,7 +21,7 @@ from src.model_loader import (
 )
 from src.pgd import choose_show_restart, run_pgd_batch
 from src.plot_panel import plot_panels
-from src.plot_save import save_panel_outputs
+from src.plot_save import format_panel_metadata, save_panel_outputs
 
 
 def print_clean_diagnostics(
@@ -237,7 +237,8 @@ def save_all_outputs(
     base: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> None:
-    """Save all panel outputs to files."""
+    """Save all panel outputs (arrays, images, metadata) to subdirectories."""
+    # Save arrays and images for each panel
     for i, panel in enumerate(panels, start=1):
         save_panel_outputs(
             out_dir=str(args.out_dir),
@@ -247,6 +248,40 @@ def save_all_outputs(
             panel=panel,
         )
 
+    # Save unified metadata file
+    metadata_dir = os.path.join(args.out_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
+    meta_txt = os.path.join(metadata_dir, f"{base}_meta.txt")
+
+    df_params = ""
+    if args.init == "deepfool":
+        df_params = (
+            f"df_max_iter={args.df_max_iter}\n"
+            f"df_overshoot={args.df_overshoot}\n"
+            f"df_jitter={args.df_jitter}\n"
+            f"df_project={args.df_project}\n"
+        )
+
+    content = (
+        "[PARAMETERS]\n"
+        f"dataset={args.dataset}\n"
+        f"epsilon={args.epsilon}\n"
+        f"alpha={args.alpha}\n"
+        f"total_iter={args.total_iter}\n"
+        f"num_restarts={args.num_restarts}\n"
+        f"seed={args.seed}\n"
+        f"init={args.init}\n"
+        f"{df_params}\n"
+    )
+
+    for i, panel in enumerate(panels, start=1):
+        content += format_panel_metadata(panel, i, args)
+
+    with open(meta_txt, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    LOGGER.info(f"[save] metadata={meta_txt}")
+
 
 def render_figure(
     args: argparse.Namespace,
@@ -254,8 +289,10 @@ def render_figure(
     title: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> str:
-    """Render and save the figure."""
-    out_png = os.path.join(args.out_dir, f"{base}.png")
+    """Render and save the figure to figures/ subdirectory."""
+    figures_dir = os.path.join(args.out_dir, "figures")
+    os.makedirs(figures_dir, exist_ok=True)
+    out_png = os.path.join(figures_dir, f"{base}.png")
     plot_panels(
         dataset=str(args.dataset),
         panels=panels,
