@@ -807,6 +807,8 @@ def plot_panels(
     init_sanity_plot: bool,
     eps: float,
     init_mode: str = "random",
+    df_max_iter: int = 0,
+    total_iter: int = 100,
 ) -> None:
     num_panels = int(len(panels))
     if num_panels < 1 or num_panels > 5:
@@ -846,6 +848,12 @@ def plot_panels(
     for col, panel in enumerate(panels):
         losses = panel.pgd.losses
         corrects = panel.pgd.corrects
+
+        # multi_deepfool: slice out DeepFool portion, display PGD part only (iter 0 = DeepFool endpoint)
+        if init_mode == "multi_deepfool" and df_max_iter > 0:
+            losses = losses[:, df_max_iter:]
+            corrects = corrects[:, df_max_iter:]
+
         restarts, iter_plus1 = losses.shape
         xs = np.arange(iter_plus1)
 
@@ -874,6 +882,9 @@ def plot_panels(
         ax1.ticklabel_format(axis="y", style="plain", useOffset=False)
         ax1.yaxis.get_offset_text().set_visible(False)
 
+        # Fix x-axis range to total_iter for consistent comparison
+        ax1.set_xlim(0, total_iter)
+
         ax2 = fig.add_subplot(gs[1, col], sharex=ax1)
         ax2.imshow(
             corrects.astype(np.int8),
@@ -883,6 +894,7 @@ def plot_panels(
             cmap=cmap,
             vmin=0,
             vmax=1,
+            extent=[0, iter_plus1 - 1, -0.5, restarts - 0.5],
         )
         ax2.set_xlabel("Iterations")
         ax2.set_ylabel("restart (run)" if col == 0 else "")
@@ -1381,6 +1393,8 @@ def render_figure(
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "multi_deepfool"),
         eps=float(args.epsilon),
         init_mode=str(args.init),
+        df_max_iter=int(args.df_max_iter) if args.init == "multi_deepfool" else 0,
+        total_iter=int(args.total_iter),
     )
     return out_png
 
