@@ -65,8 +65,12 @@ def deepfool_init_point(
             break
 
         r = best_r_flat.reshape(x.shape[1:])
-        x = x + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+        x = x + r[np.newaxis, ...]
         x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
+
+    # Apply overshoot once at the end (per original paper)
+    x = x0 + (1.0 + float(overshoot)) * (x - x0)
+    x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
     return x.astype(np.float32)
 
@@ -128,10 +132,14 @@ def deepfool_init_point_with_trace(
             break
 
         r = best_r_flat.reshape(x.shape[1:])
-        x = x + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+        x = x + r[np.newaxis, ...]
         x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
         trace.append(x.copy())
+
+    # Apply overshoot once at the end (per original paper)
+    x = x0 + (1.0 + float(overshoot)) * (x - x0)
+    x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
     return x.astype(np.float32), tuple(trace)
 

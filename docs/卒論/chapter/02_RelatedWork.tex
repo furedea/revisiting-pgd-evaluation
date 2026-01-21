@@ -45,32 +45,35 @@ CIFAR10は10種類の物体（飛行機，自動車，鳥，猫，鹿，犬，�
 
 \section{PGD攻撃}
 \label{sec:pgd}
-射影勾配降下法（Projected Gradient Descent; PGD）は，制約付き最適化問題を解くための標準的な反復手法である．Madryらはにおいて，この手法を敵対的サンプルの生成に適用し，PGD攻撃として定式化した\cite{PGD}．PGD攻撃は，制約付き最適化問題を反復的に解くことで，摂動の大きさに制限を設けながらモデルの損失を最大化する敵対的摂動を求める．
+射影勾配降下法（Projected Gradient Descent; PGD）は，制約付き最適化問題を解くための標準的な反復手法である．Madryらはこの手法を敵対的サンプルの生成に適用し，PGD攻撃として定式化した\cite{PGD}．PGD攻撃は，制約付き最適化問題を反復的に解くことで，摂動の大きさに制限を設けながらモデルの損失を最大化する敵対的摂動を求める．
 
 \subsection{問題設定}
-入力画像を$x \in \mathbb{R}^D$（$D$は入力次元数），正解ラベルを$y$，モデルを$f$，損失関数を$L(x, y)$とする．PGD攻撃は，摂動の$\ell_\infty$ノルムが$\varepsilon$以下という制約のもとで損失を最大化する問題を解く：
+入力画像を$x \in \mathbb{R}^D$（$D$は入力次元数），正解ラベルを$y$，モデルを$f$，損失関数を$L(x, y)$とする．PGD攻撃は，摂動の$\ell_\infty$ノルムが$\varepsilon$以下という制約のもとで損失を最大化する，以下の式(\ref{eq:pgd_objective})で定義される問題を解く．
 \begin{align}
     \max_{\delta} L(x + \delta, y) \quad \text{s.t.} \quad \|\delta\|_\infty \leq \varepsilon
+    \label{eq:pgd_objective}
 \end{align}
 ここで$\varepsilon > 0$は摂動の強さを制御するパラメータである．
 
 \subsection{更新式}
-PGD攻撃では以下の更新式を$T$回反復する：
+PGD攻撃では式(\ref{eq:pgd})に示す更新式を$T$回反復する．
 \begin{align}
     x^{t+1}_{\text{adv}} = \Pi_{x + \mathcal{S}} \left( x^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t_{\text{adv}}, y) \right) \right)
     \label{eq:pgd}
 \end{align}
 ここで，$\alpha$はステップサイズ（$0 < \alpha < \varepsilon$），$\text{sign}(\cdot)$は各成分の符号を取る関数，$\nabla_{x} L$は入力に関する損失の勾配である．また，$\mathcal{S} = \{\delta \in \mathbb{R}^D : \|\delta\|_\infty \leq \varepsilon\}$は許容される摂動の集合であり，$\Pi_{x + \mathcal{S}}(\cdot)$は集合$x + \mathcal{S}$への射影演算子である．
 
-$\ell_\infty$ノルム制約下での射影は成分毎のクリッピングで実現される：
+$\ell_\infty$ノルム制約下での射影は，式(\ref{eq:projection})に示すように成分毎のクリッピングで実現される．
 \begin{align}
     \left\{\Pi_{x + \mathcal{S}}(z)\right\}_i = \text{clip}(z_i, x_i - \varepsilon, x_i + \varepsilon)
+    \label{eq:projection}
 \end{align}
 
 \subsection{ランダム初期化}
-PGD攻撃には初期点$x^0_{\text{adv}}$の設定が必要である．入力点$x$から開始する方法もあるが，ランダム初期化PGDでは制約範囲$x + \mathcal{S}$内の一様乱数点から開始する：
+PGD攻撃には初期点$x^0_{\text{adv}}$の設定が必要である．入力点$x$から開始する方法もあるが，ランダム初期化PGDでは式(\ref{eq:random_init})に示すように制約範囲$x + \mathcal{S}$内の一様乱数点から開始する．
 \begin{align}
     x^0_{\text{adv}} = x + u, \quad u \sim \text{Uniform}(-\varepsilon, \varepsilon)^D
+    \label{eq:random_init}
 \end{align}
 ランダム初期化により，複数の異なる初期点から攻撃を行うことで局所最適解への陥りを緩和できる．複数回の試行のうち最も損失が大きくなった敵対的サンプルを採用することが一般的である．
 

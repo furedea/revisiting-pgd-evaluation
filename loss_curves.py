@@ -425,8 +425,12 @@ def deepfool_single_target(
         r_flat, _ = compute_perturbation_to_target(f, grads_all, start_label, target_class)
 
         r = r_flat.reshape(x.shape[1:])
-        x = x + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+        x = x + r[np.newaxis, ...]
         x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
+
+    # Apply overshoot once at the end (per original paper)
+    x = x0 + (1.0 + float(overshoot)) * (x - x0)
+    x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
     return x.astype(np.float32)
 
@@ -520,7 +524,7 @@ def multi_deepfool_with_trace(
                 )
 
                 r = r_flat.reshape(x_curr.shape[1:])
-                x_curr = x_curr + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+                x_curr = x_curr + r[np.newaxis, ...]
                 x_curr = clip_to_unit_interval(x_curr)
 
             # Project to eps-ball and record
@@ -532,6 +536,10 @@ def multi_deepfool_with_trace(
             )
             losses[idx, i + 1] = float(lt[0])
             preds[idx, i + 1] = int(pt[0])
+
+        # Apply overshoot once at the end (per original paper)
+        x_curr = x0 + (1.0 + float(overshoot)) * (x_curr - x0)
+        x_curr = clip_to_unit_interval(x_curr)
 
         # Final point (projected to eps-ball)
         x_final = clip_to_unit_interval(project_linf(x_curr, x0, float(eps)))
