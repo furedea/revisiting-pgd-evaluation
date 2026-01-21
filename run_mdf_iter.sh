@@ -40,9 +40,8 @@ NUM_RESTARTS=9
 TOTAL_ITER=100
 DF_OVERSHOOT=0.02
 
-# Experiment names
-EXP_RANDOM=mdf_iter_random
-EXP_MULTI_DEEPFOOL=mdf_iter_sweep
+# Experiment name
+EXP_NAME=run_mdf_iter
 
 # ------------------------------------------------------------------
 # MNIST (nat) - random baseline
@@ -51,7 +50,7 @@ run "mnist_nat_random" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -66,7 +65,7 @@ for df_iter in "${DF_ITERS[@]}"; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_MULTI_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init multi_deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -82,7 +81,7 @@ run "mnist_adv_random" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -97,7 +96,7 @@ for df_iter in "${DF_ITERS[@]}"; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_MULTI_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init multi_deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -113,7 +112,7 @@ run "cifar10_nat_random" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -128,7 +127,7 @@ for df_iter in "${DF_ITERS[@]}"; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_MULTI_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init multi_deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -144,7 +143,7 @@ run "cifar10_adv_random" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -159,7 +158,7 @@ for df_iter in "${DF_ITERS[@]}"; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_MULTI_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init multi_deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \

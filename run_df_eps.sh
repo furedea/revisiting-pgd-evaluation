@@ -43,9 +43,8 @@ TOTAL_ITER=100
 DF_MAX_ITER=50
 DF_OVERSHOOT=0.02
 
-# Experiment names
-EXP_RANDOM=df_eps_random
-EXP_DEEPFOOL=df_eps_deepfool
+# Experiment name
+EXP_NAME=run_df_eps
 
 # ------------------------------------------------------------------
 # MNIST (nat) - epsilon 1x, 2x, 3x
@@ -56,7 +55,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_RANDOM" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init random --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -67,7 +66,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -85,7 +84,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_RANDOM" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init random --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -96,7 +95,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/mnist_challenge \
     --ckpt_dir model_src/mnist_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset mnist \
     --init deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -114,7 +113,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_RANDOM" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init random --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -125,7 +124,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/nat \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -143,7 +142,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_RANDOM" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init random --seed 0 \
     --n_examples "$N_EXAMPLES" \
@@ -154,7 +153,7 @@ for mult in 1 2 3; do
     --model_src_dir model_src/cifar10_challenge \
     --ckpt_dir model_src/cifar10_challenge/models/adv \
     --out_dir "$OUT_DIR" \
-    --exp_name "$EXP_DEEPFOOL" \
+    --exp_name "$EXP_NAME" \
     --dataset cifar10 \
     --init deepfool --seed 0 \
     --n_examples "$N_EXAMPLES" \

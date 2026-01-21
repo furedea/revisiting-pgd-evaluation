@@ -38,10 +38,8 @@ TOTAL_ITER=100
 DF_MAX_ITER=50
 DF_OVERSHOOT=0.02
 
-# Experiment names
-EXP_RANDOM=random_init
-EXP_DEEPFOOL=deepfool_init
-EXP_MULTI_DEEPFOOL=multi_deepfool_init
+# Experiment name
+EXP_NAME=run_all
 
 # ==================================================================
 # src/main.py: random init
@@ -50,7 +48,7 @@ run "src/main.py" "src_mnist_nat_random" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -61,7 +59,7 @@ run "src/main.py" "src_mnist_adv_random" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -72,7 +70,7 @@ run "src/main.py" "src_cifar10_nat_random" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -83,7 +81,7 @@ run "src/main.py" "src_cifar10_adv_random" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_RANDOM" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -97,7 +95,7 @@ run "src/main.py" "src_mnist_nat_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -109,7 +107,7 @@ run "src/main.py" "src_mnist_adv_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -121,7 +119,7 @@ run "src/main.py" "src_cifar10_nat_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -133,7 +131,7 @@ run "src/main.py" "src_cifar10_adv_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -148,7 +146,7 @@ run "loss_curves.py" "lc_mnist_nat_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_MULTI_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -160,7 +158,7 @@ run "loss_curves.py" "lc_mnist_adv_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_MULTI_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -172,7 +170,7 @@ run "loss_curves.py" "lc_cifar10_nat_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_MULTI_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
@@ -184,7 +182,7 @@ run "loss_curves.py" "lc_cifar10_adv_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --exp_name "$EXP_MULTI_DEEPFOOL" \
+  --exp_name "$EXP_NAME" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \

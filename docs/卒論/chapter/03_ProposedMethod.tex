@@ -20,17 +20,17 @@ DeepFool初期化により，以下の効果が期待される：
 本節では，DeepFool初期化の具体的な手順を説明する．
 
 \subsection{DeepFoolによる敵対的サンプルの生成}
-まず，入力画像$\bm{x}$に対してDeepFoolを適用し，敵対的サンプル$\bm{x}_{\text{df}}$を生成する．DeepFoolの更新式は式(\ref{eq:deepfool})で示した通りであり，パラメータとして最大反復回数$T_{\text{df}}$とオーバーシュート係数$\eta$を設定する．本研究では$T_{\text{df}} = 50$，$\eta = 0.02$を用いる．
+まず，入力画像$x$に対してDeepFoolを適用し，敵対的サンプル$x_{\text{df}}$を生成する．DeepFoolの更新式は式(\ref{eq:deepfool})で示した通りであり，パラメータとして最大反復回数$T_{\text{df}}$とオーバーシュート係数$\eta$を設定する．本研究では$T_{\text{df}} = 50$，$\eta = 0.02$を用いる．
 
 \subsection{$\ell_\infty$制約への射影}
-DeepFoolは$\ell_2$ノルム最小の摂動を求める手法であるため，得られた敵対的サンプル$\bm{x}_{\text{df}}$はPGD攻撃の$\ell_\infty$制約を満たさない場合がある．そのため，$\bm{x}_{\text{df}}$を$\ell_\infty$制約範囲に射影してPGDの初期点$\bm{x}_{\text{init}}$を得る必要がある．
+DeepFoolは$\ell_2$ノルム最小の摂動を求める手法であるため，得られた敵対的サンプル$x_{\text{df}}$はPGD攻撃の$\ell_\infty$制約を満たさない場合がある．そのため，$x_{\text{df}}$を$\ell_\infty$制約範囲に射影してPGDの初期点$x_{\text{init}}$を得る必要がある．
 
 この射影方法として，以下の2つの方法を検討する．
 
 \subsubsection{成分毎クリッピング}
 DeepFoolによる敵対的サンプルの各成分を個別に$\ell_\infty$制約範囲にクリッピングする：
 \begin{align}
-    \{\bm{x}_{\text{init}}\}_i = \text{clip}(\{\bm{x}_{\text{df}}\}_i, \{\bm{x}\}_i - \varepsilon, \{\bm{x}\}_i + \varepsilon)
+    \{x_{\text{init}}\}_i = \text{clip}(\{x_{\text{df}}\}_i, \{x\}_i - \varepsilon, \{x\}_i + \varepsilon)
     \label{eq:clip}
 \end{align}
 ここで$\{\cdot\}_i$は$i$番目の成分を表す．この方法では，各成分が独立に制約範囲に収められるため，摂動の方向（各成分の比率）が元のDeepFool摂動から変化する可能性がある．
@@ -38,17 +38,17 @@ DeepFoolによる敵対的サンプルの各成分を個別に$\ell_\infty$制�
 \subsubsection{スケーリング}
 摂動の方向を保持したまま，$\ell_\infty$ノルムが$\varepsilon$以下となるようにスケーリングする：
 \begin{align}
-    \bm{x}_{\text{init}} = \bm{x} + s \cdot \bm{\delta}_{\text{df}}
+    x_{\text{init}} = x + s \cdot \delta_{\text{df}}
     \label{eq:scale}
 \end{align}
-ここで$\bm{\delta}_{\text{df}} = \bm{x}_{\text{df}} - \bm{x}$はDeepFoolによる摂動であり，スケーリング係数$s$は以下のように定める：
+ここで$\delta_{\text{df}} = x_{\text{df}} - x$はDeepFoolによる摂動であり，スケーリング係数$s$は以下のように定める：
 \begin{align}
-    s = \min\left(1, \frac{\varepsilon}{\|\bm{\delta}_{\text{df}}\|_\infty}\right)
+    s = \min\left(1, \frac{\varepsilon}{\|\delta_{\text{df}}\|_\infty}\right)
 \end{align}
-この方法では摂動の方向は保存されるが，$\|\bm{\delta}_{\text{df}}\|_\infty > \varepsilon$の場合は摂動が縮小されるため，ラベル境界から入力点寄りに戻される可能性がある．
+この方法では摂動の方向は保存されるが，$\|\delta_{\text{df}}\|_\infty > \varepsilon$の場合は摂動が縮小されるため，ラベル境界から入力点寄りに戻される可能性がある．
 
 \subsection{PGD攻撃の実行}
-射影後の初期点$\bm{x}_{\text{init}}$から通常のPGD攻撃を開始する．更新式は式(\ref{eq:pgd})と同様であり，$\bm{x}^0_{\text{adv}} = \bm{x}_{\text{init}}$として反復を行う．
+射影後の初期点$x_{\text{init}}$から通常のPGD攻撃を開始する．更新式は式(\ref{eq:pgd})と同様であり，$x^0_{\text{adv}} = x_{\text{init}}$として反復を行う．
 
 \section{Multi-DeepFool初期化}
 \label{sec:multi_deepfool}
@@ -59,16 +59,16 @@ DeepFoolによる敵対的サンプルの各成分を個別に$\ell_\infty$制�
 \subsection{複数ターゲットへのDeepFool}
 予測ラベル$y$以外の各ラベル$k \neq y$について，ラベル$k$を目標としたDeepFoolを実行する．ラベル$k$を目標とするDeepFoolでは，式(\ref{eq:deepfool})において$k^*_t = k$と固定して更新を行う：
 \begin{align}
-    \bm{r}_{t,k} = -\frac{g_k(\bm{x}_t)}{\|\nabla g_k(\bm{x}_t)\|_2^2} \nabla g_k(\bm{x}_t)
+    r_{t,k} = -\frac{g_k(x_t)}{\|\nabla g_k(x_t)\|_2^2} \nabla g_k(x_t)
 \end{align}
-これにより，各ターゲットラベル$k$に対して敵対的サンプル$\bm{x}^{(k)}_{\text{df}}$が得られる．
+これにより，各ターゲットラベル$k$に対して敵対的サンプル$x^{(k)}_{\text{df}}$が得られる．
 
 \subsection{最大損失選択}
 各ターゲットラベルに対するDeepFool結果を$\ell_\infty$制約範囲に射影し，それぞれについて損失を計算する．その中で最も損失が大きい点をPGD攻撃の初期点として選択する：
 \begin{align}
-    \bm{x}_{\text{init}} = \arg\max_{\bm{x}^{(k)}_{\text{init}}} L(\bm{x}^{(k)}_{\text{init}}, y)
+    x_{\text{init}} = \arg\max_{x^{(k)}_{\text{init}}} L(x^{(k)}_{\text{init}}, y)
 \end{align}
-ここで$\bm{x}^{(k)}_{\text{init}}$は$\bm{x}^{(k)}_{\text{df}}$を$\ell_\infty$制約範囲に射影した点である．
+ここで$x^{(k)}_{\text{init}}$は$x^{(k)}_{\text{df}}$を$\ell_\infty$制約範囲に射影した点である．
 
 \section{提案手法の全体像}
 \label{sec:overview}
@@ -78,15 +78,15 @@ DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg:deepf
 \caption{DeepFool初期化によるPGD攻撃}
 \label{alg:deepfool_init}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$\bm{x}$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復回数$T_{\text{pgd}}$，DeepFoolパラメータ$(T_{\text{df}}, \eta)$
-\ENSURE 敵対的サンプル$\bm{x}_{\text{adv}}$
-\STATE DeepFoolを適用して$\bm{x}_{\text{df}}$を取得
-\STATE $\bm{x}_{\text{init}} \leftarrow$ $\bm{x}_{\text{df}}$を$\ell_\infty$制約範囲に射影（式(\ref{eq:clip})または式(\ref{eq:scale})）
-\STATE $\bm{x}^0_{\text{adv}} \leftarrow \bm{x}_{\text{init}}$
+\REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復回数$T_{\text{pgd}}$，DeepFoolパラメータ$(T_{\text{df}}, \eta)$
+\ENSURE 敵対的サンプル$x_{\text{adv}}$
+\STATE DeepFoolを適用して$x_{\text{df}}$を取得
+\STATE $x_{\text{init}} \leftarrow$ $x_{\text{df}}$を$\ell_\infty$制約範囲に射影（式(\ref{eq:clip})または式(\ref{eq:scale})）
+\STATE $x^0_{\text{adv}} \leftarrow x_{\text{init}}$
 \FOR{$t = 0$ to $T_{\text{pgd}} - 1$}
-    \STATE $\bm{x}^{t+1}_{\text{adv}} \leftarrow \Pi_{\bm{x} + \mathcal{S}} \left( \bm{x}^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{\bm{x}} L(\bm{x}^t_{\text{adv}}, y) \right) \right)$
+    \STATE $x^{t+1}_{\text{adv}} \leftarrow \Pi_{x + \mathcal{S}} \left( x^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t_{\text{adv}}, y) \right) \right)$
 \ENDFOR
-\RETURN $\bm{x}^{T_{\text{pgd}}}_{\text{adv}}$
+\RETURN $x^{T_{\text{pgd}}}_{\text{adv}}$
 \end{algorithmic}
 \end{algorithm}
 
@@ -101,11 +101,11 @@ DeepFoolは決定論的なアルゴリズムであり，同じ入力に対して
 
 ランダム性を導入するため，DeepFoolの敵対的サンプルに微小なランダムノイズ（ジッター）を加えることを検討する：
 \begin{align}
-    \bm{x}'_{\text{df}} = \bm{x}_{\text{df}} + \bm{j}, \quad \bm{j} \sim \text{Uniform}(-\text{jitter}, \text{jitter})^D
+    x'_{\text{df}} = x_{\text{df}} + j, \quad j \sim \text{Uniform}(-\text{jitter}, \text{jitter})^D
 \end{align}
 ここでjitterはノイズの大きさを制御するパラメータである．
 
 \subsection{損失関数との関係}
-本研究ではクロスエントロピー損失を用いるが，DeepFoolはロジットの差$g_k(\bm{x})$に基づいてラベル境界を近似している．ラベル境界上（$g_k = 0$）ではクロスエントロピー損失は$\ln 2 \approx 0.693$程度であり，必ずしも損失が大きい点とは限らない．
+本研究ではクロスエントロピー損失を用いるが，DeepFoolはロジットの差$g_k(x)$に基づいてラベル境界を近似している．ラベル境界上（$g_k = 0$）ではクロスエントロピー損失は$\ln 2 \approx 0.693$程度であり，必ずしも損失が大きい点とは限らない．
 
 特に自然学習モデルの場合，PGD攻撃により損失が非常に大きくなる傾向があり，DeepFoolで得られる初期損失が相対的に小さくなる場合がある．一方，敵対的学習モデルでは損失の増加が抑制されているため，DeepFool初期化の効果がより顕著に現れる可能性がある．
