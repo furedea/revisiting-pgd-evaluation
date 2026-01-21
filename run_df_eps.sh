@@ -4,7 +4,7 @@ set -Eeuo pipefail
 # ---- settings you may change
 PYTHON="${PYTHON:-python}"
 SCRIPT="${SCRIPT:-src/main.py}"
-OUT_DIR="${OUT_DIR:-/work/outputs_src}"
+OUT_DIR="${OUT_DIR:-/work/outputs}"
 LOG_DIR="${LOG_DIR:-${OUT_DIR}/logs}"
 
 mkdir -p "$OUT_DIR" "$LOG_DIR"
