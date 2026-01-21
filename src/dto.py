@@ -146,6 +146,7 @@ class ExamplePanel:
     __slots__ = (
         "x_nat",
         "y_nat",
+        "x_df",
         "x_adv_show",
         "show_restart",
         "pred_end",
@@ -162,9 +163,11 @@ class ExamplePanel:
         pred_end: int,
         pgd: PGDBatchResult,
         sanity: Optional[InitSanityMetrics],
+        x_df: Optional[np.ndarray] = None,
     ) -> None:
         self.x_nat = x_nat
         self.y_nat = y_nat
+        self.x_df = x_df
         self.x_adv_show = x_adv_show
         self.show_restart = show_restart
         self.pred_end = pred_end

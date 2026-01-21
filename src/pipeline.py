@@ -214,6 +214,7 @@ def run_one_example(
         pred_end=int(pred_end),
         pgd=pgd,
         sanity=sanity,
+        x_df=x_df,
     )
 
 

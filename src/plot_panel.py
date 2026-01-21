@@ -63,14 +63,24 @@ def plot_single_panel(
     ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
     ax2.tick_params(labelbottom=True)
 
-    sub = gs[2, col].subgridspec(1, 2, wspace=0.08)
+    # Display 3 images if x_df exists, otherwise 2
+    num_imgs = 3 if panel.x_df is not None else 2
+    sub = gs[2, col].subgridspec(1, num_imgs, wspace=0.08)
     ax3a = fig.add_subplot(sub[0, 0])
-    ax3b = fig.add_subplot(sub[0, 1])
+    if num_imgs == 3:
+        ax3b = fig.add_subplot(sub[0, 1])
+        ax3c = fig.add_subplot(sub[0, 2])
+    else:
+        ax3c = fig.add_subplot(sub[0, 1])
 
     ax3a.axis("off")
-    ax3b.axis("off")
+    ax3c.axis("off")
     ax3a.set_title("x_nat", fontsize=11, pad=6)
-    ax3b.set_title("x_adv", fontsize=11, pad=6)
+    ax3c.set_title("x_adv", fontsize=11, pad=6)
+
+    if num_imgs == 3:
+        ax3b.axis("off")
+        ax3b.set_title("x_df", fontsize=11, pad=6)
 
     if dataset == "mnist":
         ax3a.imshow(
@@ -79,7 +89,14 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        ax3b.imshow(
+        if num_imgs == 3 and panel.x_df is not None:
+            ax3b.imshow(
+                np.squeeze(panel.x_df).reshape(28, 28),
+                cmap="gray",
+                vmin=0.0,
+                vmax=1.0,
+            )
+        ax3c.imshow(
             np.squeeze(panel.x_adv_show).reshape(28, 28),
             cmap="gray",
             vmin=0.0,
@@ -91,7 +108,13 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        ax3b.imshow(
+        if num_imgs == 3 and panel.x_df is not None:
+            ax3b.imshow(
+                np.clip(np.squeeze(panel.x_df).reshape(32, 32, 3), 0.0, 1.0),
+                vmin=0.0,
+                vmax=1.0,
+            )
+        ax3c.imshow(
             np.clip(np.squeeze(panel.x_adv_show).reshape(32, 32, 3), 0.0, 1.0),
             vmin=0.0,
             vmax=1.0,
