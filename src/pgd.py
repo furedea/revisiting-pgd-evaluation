@@ -25,7 +25,6 @@ def build_initial_points(
     init_jitter: float,
     x_nat_batch: np.ndarray,
     eps: float,
-    do_clip: bool,
 ) -> np.ndarray:
     """Build initial adversarial points for PGD."""
     if init == "deepfool":
@@ -34,11 +33,11 @@ def build_initial_points(
         x_adv = np.repeat(x_init.astype(np.float32), x_nat_batch.shape[0], axis=0)
         x_adv = add_jitter(rng=rng, x=x_adv, jitter=float(init_jitter))
         x_adv = project_linf(x_adv, x_nat_batch, float(eps))
-        return clip_to_unit_interval(x_adv) if do_clip else x_adv
+        return clip_to_unit_interval(x_adv)
 
     noise = rng.uniform(low=-eps, high=eps, size=x_nat_batch.shape).astype(np.float32)
     x_adv = project_linf(x_nat_batch + noise, x_nat_batch, float(eps))
-    return clip_to_unit_interval(x_adv) if do_clip else x_adv
+    return clip_to_unit_interval(x_adv)
 
 
 def run_pgd_batch(
@@ -48,10 +47,9 @@ def run_pgd_batch(
     y_nat: np.ndarray,
     eps: float,
     alpha: float,
-    steps: int,
+    total_iter: int,
     num_restarts: int,
     seed: int,
-    do_clip: bool,
     init: str,
     x_init: Optional[np.ndarray],
     init_jitter: float,
@@ -59,7 +57,7 @@ def run_pgd_batch(
     """Run PGD attack with multiple restarts."""
     rng = np.random.RandomState(int(seed))
     restarts = int(num_restarts)
-    total_steps = int(steps)
+    total_steps = int(total_iter)
 
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
     x_nat_batch = np.repeat(x_nat.astype(np.float32), restarts, axis=0)
@@ -74,7 +72,6 @@ def run_pgd_batch(
         init_jitter=float(init_jitter),
         x_nat_batch=x_nat_batch,
         eps=float(eps),
-        do_clip=bool(do_clip),
     )
 
     l0, p0 = sess.run(
@@ -88,7 +85,7 @@ def run_pgd_batch(
         grad = sess.run(ops.grad_op, feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch})
         x_adv = x_adv + float(alpha) * np.sign(grad).astype(np.float32)
         x_adv = project_linf(x_adv, x_nat_batch, float(eps))
-        x_adv = clip_to_unit_interval(x_adv) if do_clip else x_adv
+        x_adv = clip_to_unit_interval(x_adv)
 
         lt, pt = sess.run(
             [ops.per_ex_loss_op, ops.y_pred_op],

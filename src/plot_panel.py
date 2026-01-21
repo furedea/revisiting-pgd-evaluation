@@ -26,7 +26,6 @@ def plot_single_panel(
     col: int,
     panel: ExamplePanel,
     dataset: str,
-    alpha_line: float,
 ) -> None:
     """Plot a single panel (loss curves, correctness heatmap, images)."""
     cmap = ListedColormap(["#440154", "#FDE725"])
@@ -37,7 +36,7 @@ def plot_single_panel(
 
     ax1 = fig.add_subplot(gs[0, col])
     for r in range(restarts):
-        ax1.plot(xs, losses[r], linewidth=1, alpha=float(alpha_line))
+        ax1.plot(xs, losses[r], linewidth=1, alpha=0.9)
     ax1.set_xlabel("PGD Iterations")
     ax1.set_ylabel("Cross-entropy Loss" if col == 0 else "")
     ax1.tick_params(labelbottom=True)
@@ -104,7 +103,6 @@ def plot_panels(
     panels: Tuple[ExamplePanel, ...],
     out_png: str,
     title: str,
-    alpha_line: float,
     init_sanity_plot: bool,
     eps: float,
 ) -> None:
@@ -116,7 +114,7 @@ def plot_panels(
     add_correctness_legend(fig)
 
     for col, panel in enumerate(panels):
-        plot_single_panel(fig, gs, col, panel, dataset, alpha_line)
+        plot_single_panel(fig, gs, col, panel, dataset)
 
     if show_sanity_row:
         plot_sanity_row(fig, gs, panels, eps)

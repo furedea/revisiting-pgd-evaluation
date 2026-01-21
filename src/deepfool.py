@@ -143,7 +143,6 @@ def select_maxloss_within_eps(
     x_nat: np.ndarray,
     y_nat: np.ndarray,
     eps: float,
-    do_clip: bool,
     project: str = "clip",
 ) -> Tuple[Optional[np.ndarray], Optional[float]]:
     """Pick argmax loss among projected points onto Linf-ball."""
@@ -161,7 +160,7 @@ def select_maxloss_within_eps(
         else:
             raise ValueError(f"Unknown project: {project}")
 
-        x_proj = clip_to_unit_interval(x_proj) if bool(do_clip) else x_proj
+        x_proj = clip_to_unit_interval(x_proj)
 
         loss_vec = sess.run(
             ops.per_ex_loss_op,
@@ -181,7 +180,6 @@ def build_deepfool_init(
     ops: ModelOps,
     x_nat: np.ndarray,
     y_nat: np.ndarray,
-    do_clip: bool,
     df_max_iter: int,
     df_overshoot: float,
     df_project: str,
@@ -228,7 +226,6 @@ def build_deepfool_init(
             x_nat=x_nat,
             y_nat=y_nat,
             eps=eps,
-            do_clip=do_clip,
         )
         if best_x is None:
             LOGGER.info("[deepfool] maxloss: no trace point within eps; fallback to scale")
@@ -241,5 +238,5 @@ def build_deepfool_init(
     else:
         raise ValueError(f"Unknown df_project: {df_project}")
 
-    x_init = clip_to_unit_interval(x_init) if bool(do_clip) else x_init
+    x_init = clip_to_unit_interval(x_init)
     return x_df, x_init

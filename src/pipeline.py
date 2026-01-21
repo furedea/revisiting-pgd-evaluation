@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-from src.cli import format_base_name, format_title
+from src.cli import format_base_name, format_title, get_model_tag
 from src.data_loader import load_test_data
 from src.deepfool import build_deepfool_init
 from src.dto import ExamplePanel, InitSanityMetrics, ModelOps
@@ -138,20 +138,6 @@ def find_correct_indices(
     return tuple(int(i) for i in found_indices)
 
 
-def run_check_only(
-    sess: tf.compat.v1.Session,
-    ops: ModelOps,
-    x_test: np.ndarray,
-    y_test: np.ndarray,
-    start_idx: int,
-) -> None:
-    """Run check-only mode to verify model loading."""
-    x_nat = x_test[start_idx : start_idx + 1].astype(np.float32)
-    y_nat = y_test[start_idx : start_idx + 1].astype(np.int64)
-    print_clean_diagnostics(sess, ops, x_nat, y_nat)
-    LOGGER.info({"action": "exit", "reason": "check_only"})
-
-
 def run_one_example(
     args: argparse.Namespace,
     sess: tf.compat.v1.Session,
@@ -166,8 +152,6 @@ def run_one_example(
 
     print_clean_diagnostics(sess, ops, x_nat, y_nat)
 
-    do_clip = not bool(args.no_clip)
-
     x_df = None
     x_init = None
     init_jitter = 0.0
@@ -178,7 +162,6 @@ def run_one_example(
             ops=ops,
             x_nat=x_nat,
             y_nat=y_nat,
-            do_clip=do_clip,
             df_max_iter=int(args.df_max_iter),
             df_overshoot=float(args.df_overshoot),
             df_project=str(getattr(args, "df_project", "clip")),
@@ -203,10 +186,9 @@ def run_one_example(
         y_nat=y_nat,
         eps=float(args.epsilon),
         alpha=float(args.alpha),
-        steps=int(args.steps),
+        total_iter=int(args.total_iter),
         num_restarts=int(args.num_restarts),
         seed=int(args.seed),
-        do_clip=do_clip,
         init=str(args.init),
         x_init=x_init,
         init_jitter=init_jitter,
@@ -279,7 +261,6 @@ def render_figure(
         panels=panels,
         out_png=out_png,
         title=str(title),
-        alpha_line=float(args.alpha_line),
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "deepfool"),
         eps=float(args.epsilon),
     )
@@ -303,10 +284,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
         restore_checkpoint(sess, saver, str(args.ckpt_dir))
         x_test, y_test = load_test_data(str(args.dataset), model_src_dir)
 
-        if bool(args.check_only):
-            run_check_only(sess, ops, x_test, y_test, int(args.start_idx))
-            return
-
         indices = find_correct_indices(
             sess=sess,
             ops=ops,
@@ -318,6 +295,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         )
         base = format_base_name(args, indices)
         title = format_title(args)
+        tag = get_model_tag(str(args.ckpt_dir))
 
         df_part = (
             f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot} df_jitter={args.df_jitter}"
@@ -325,8 +303,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             else ""
         )
         LOGGER.info(
-            f"[run] dataset={args.dataset} indices={indices} tag={args.tag} init={args.init}"
-            f" eps={args.epsilon} alpha={args.alpha} steps={args.steps} restarts={args.num_restarts}"
+            f"[run] dataset={args.dataset} indices={indices} tag={tag} init={args.init}"
+            f" eps={args.epsilon} alpha={args.alpha} total_iter={args.total_iter} restarts={args.num_restarts}"
             f" seed={args.seed}{df_part} out={args.out_dir}"
         )
 

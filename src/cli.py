@@ -1,6 +1,7 @@
 """Command-line interface argument parsing and formatting."""
 
 import argparse
+import os
 from typing import Tuple
 
 
@@ -20,13 +21,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epsilon", type=float, required=True)
     ap.add_argument("--alpha", type=float, required=True)
-    ap.add_argument("--steps", type=int, default=100)
+    ap.add_argument("--total_iter", type=int, default=100)
     ap.add_argument("--num_restarts", type=int, default=20)
-
-    ap.add_argument("--no_clip", action="store_true")
-    ap.add_argument("--tag", default="naturally_trained")
-    ap.add_argument("--alpha_line", type=float, default=0.9)
-    ap.add_argument("--check_only", action="store_true")
 
     ap.add_argument("--init", choices=["random", "deepfool"], default="random")
     ap.add_argument("--df_max_iter", type=int, default=50)
@@ -51,6 +47,11 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--df_max_iter must be > 0")
 
 
+def get_model_tag(ckpt_dir: str) -> str:
+    """Extract model tag from ckpt_dir basename (e.g., 'models/nat' -> 'nat')."""
+    return os.path.basename(os.path.normpath(ckpt_dir))
+
+
 def format_indices_part(indices: Tuple[int, ...]) -> str:
     """Format indices for file naming."""
     return f"idx{indices[0]}" if len(indices) == 1 else f"indices{'-'.join(str(i) for i in indices)}"
@@ -59,21 +60,22 @@ def format_indices_part(indices: Tuple[int, ...]) -> str:
 def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
     """Format base name for output files."""
     idx_part = format_indices_part(indices)
+    tag = get_model_tag(str(args.ckpt_dir))
     df_part = (
         f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}_dfj{args.df_jitter}_dfproject_{args.df_project}"
         if args.init == "deepfool"
         else ""
     )
-    clip_part = "_noclip" if args.no_clip else ""
 
     return (
-        f"{args.dataset}_fig_{args.tag}_{args.init}_init_{idx_part}_k{args.steps}"
+        f"{args.dataset}_{tag}_{args.init}_{idx_part}_k{args.total_iter}"
         f"_eps{args.epsilon}_a{args.alpha}_r{args.num_restarts}_seed{args.seed}"
-        f"{df_part}{clip_part}"
+        f"{df_part}"
     )
 
 
 def format_title(args: argparse.Namespace) -> str:
     """Format title for the figure."""
+    tag = get_model_tag(str(args.ckpt_dir))
     df_part = f", df_jitter={args.df_jitter}, df_project={args.df_project}" if args.init == "deepfool" else ""
-    return f"{args.dataset.upper()} loss curves ({args.tag}, {args.init}-init{df_part})"
+    return f"{args.dataset.upper()} loss curves ({tag}, {args.init}-init{df_part})"
