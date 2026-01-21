@@ -54,7 +54,7 @@ Madryらが公開しているリポジトリ\cite{MadryMNIST, MadryCIFAR10}か�
 \subsubsection{DeepFoolパラメータ}
 DeepFoolのパラメータは以下のように設定する：
 \begin{itemize}
-    \item 最大反復数$T_{\text{df}} = 50$
+    \item 最大反復回数$T_{\text{df}} = 50$
     \item オーバーシュート係数$\eta = 0.02$
     \item ジッターjitter $= 0.0$（デフォルト）
 \end{itemize}
@@ -78,7 +78,7 @@ DeepFoolのパラメータは以下のように設定する：
 \section{本実験の方針（今後）}
 \label{sec:future_experiments}
 
-本研究では，初期化手法とイタレーション数の関係をより系統的に調査するため，以下の実験を計画している．
+本研究では，初期化手法と反復回数の関係をより系統的に調査するため，以下の実験を計画している．
 
 \subsection{比較対象}
 \begin{itemize}
@@ -89,7 +89,7 @@ DeepFoolのパラメータは以下のように設定する：
 
 \subsection{評価指標}
 \begin{itemize}
-    \item イタレーション毎の損失曲線
+    \item 反復毎の損失曲線
     \item プラトー到達反復数の分布
     \item Robust accuracy（敵対的サンプルに対する正答率）
 \end{itemize}

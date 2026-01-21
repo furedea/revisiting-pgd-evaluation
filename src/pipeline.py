@@ -243,6 +243,7 @@ def save_all_outputs(
     for i, panel in enumerate(panels, start=1):
         save_panel_outputs(
             out_dir=str(args.out_dir),
+            exp_name=str(args.exp_name),
             base=str(base),
             dataset=str(args.dataset),
             panel_index=int(i),
@@ -250,7 +251,7 @@ def save_all_outputs(
         )
 
     # Save unified metadata file
-    metadata_dir = os.path.join(args.out_dir, "metadata")
+    metadata_dir = os.path.join(args.out_dir, "metadata", args.exp_name)
     os.makedirs(metadata_dir, exist_ok=True)
     meta_txt = os.path.join(metadata_dir, f"{base}_meta.txt")
 
@@ -291,7 +292,7 @@ def render_figure(
     panels: Tuple[ExamplePanel, ...],
 ) -> str:
     """Render and save the figure to figures/ subdirectory."""
-    figures_dir = os.path.join(args.out_dir, "figures")
+    figures_dir = os.path.join(args.out_dir, "figures", args.exp_name)
     os.makedirs(figures_dir, exist_ok=True)
     out_png = os.path.join(figures_dir, f"{base}.png")
     plot_panels(

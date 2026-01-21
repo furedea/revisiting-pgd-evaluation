@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 # ---- settings you may change
 PYTHON="${PYTHON:-python}"
-SCRIPT="${SCRIPT:-loss_curves.py}"
 OUT_DIR="${OUT_DIR:-/work/outputs}"
 LOG_DIR="${LOG_DIR:-${OUT_DIR}/logs}"
 
@@ -12,114 +11,185 @@ mkdir -p "$OUT_DIR" "$LOG_DIR"
 timestamp() { date +"%Y%m%d_%H%M%S"; }
 
 run() {
+  local script="$1"; shift
   local name="$1"; shift
   local log="${LOG_DIR}/$(timestamp)_${name}.log"
 
   echo "=================================================================="
   echo "[RUN] ${name}"
   echo "[LOG] ${log}"
-  echo "CMD: $PYTHON $SCRIPT $*"
+  echo "CMD: $PYTHON $script $*"
   echo "=================================================================="
 
   # stdout+stderr -> log (and also show on terminal)
-  $PYTHON "$SCRIPT" "$@" 2>&1 | tee "$log"
+  $PYTHON "$script" "$@" 2>&1 | tee "$log"
 }
 
-# ------------------------------------------------------------------
-# MNIST (nat)
-# ------------------------------------------------------------------
-run "mnist_nat_random" \
+# Epsilon and alpha values
+MNIST_EPS=0.3
+MNIST_ALPHA=0.01
+CIFAR10_EPS=0.03137254901960784   # 8/255
+CIFAR10_ALPHA=0.00784313725490196 # 2/255
+
+# Common parameters
+N_EXAMPLES=5
+NUM_RESTARTS=9
+TOTAL_ITER=100
+DF_MAX_ITER=50
+DF_OVERSHOOT=0.02
+
+# Experiment names
+EXP_RANDOM=random_init
+EXP_DEEPFOOL=deepfool_init
+EXP_MULTI_DEEPFOOL=multi_deepfool_init
+
+# ==================================================================
+# src/main.py: random init
+# ==================================================================
+run "src/main.py" "src_mnist_nat_random" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_RANDOM" \
   --dataset mnist \
   --init random --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 \
-  --epsilon 0.3 --alpha 0.01
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
 
-run "mnist_nat_multi_deepfool" \
+run "src/main.py" "src_mnist_adv_random" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_RANDOM" \
+  --dataset mnist \
+  --init random --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
+
+run "src/main.py" "src_cifar10_nat_random" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/nat \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_RANDOM" \
+  --dataset cifar10 \
+  --init random --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
+
+run "src/main.py" "src_cifar10_adv_random" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_RANDOM" \
+  --dataset cifar10 \
+  --init random --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
+
+# ==================================================================
+# src/main.py: deepfool init
+# ==================================================================
+run "src/main.py" "src_mnist_nat_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_DEEPFOOL" \
   --dataset mnist \
-  --init multi_deepfool --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 --df_max_iter 1 \
-  --epsilon 0.3 --alpha 0.01 \
-  --df_overshoot 0.02 --init_sanity_plot
+  --init deepfool --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
-# ------------------------------------------------------------------
-# MNIST (adv)
-# ------------------------------------------------------------------
-run "mnist_adv_random" \
+run "src/main.py" "src_mnist_adv_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_DEEPFOOL" \
   --dataset mnist \
-  --init random --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 \
-  --epsilon 0.3 --alpha 0.01
+  --init deepfool --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
-run "mnist_adv_multi_deepfool" \
+run "src/main.py" "src_cifar10_nat_deepfool" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/nat \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_DEEPFOOL" \
+  --dataset cifar10 \
+  --init deepfool --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
+
+run "src/main.py" "src_cifar10_adv_deepfool" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_DEEPFOOL" \
+  --dataset cifar10 \
+  --init deepfool --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
+
+# ==================================================================
+# loss_curves.py: multi_deepfool init
+# ==================================================================
+run "loss_curves.py" "lc_mnist_nat_multi_deepfool" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/nat \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_MULTI_DEEPFOOL" \
+  --dataset mnist \
+  --init multi_deepfool --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
+
+run "loss_curves.py" "lc_mnist_adv_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_MULTI_DEEPFOOL" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 --df_max_iter 1 \
-  --epsilon 0.3 --alpha 0.01 \
-  --df_overshoot 0.02 --init_sanity_plot
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
-# ------------------------------------------------------------------
-# CIFAR10 (nat)
-# ------------------------------------------------------------------
-run "cifar10_nat_random" \
+run "loss_curves.py" "lc_cifar10_nat_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
-  --dataset cifar10 \
-  --init random --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 \
-  --epsilon 0.03137254901960784 --alpha 0.00784313725490196
-
-run "cifar10_nat_multi_deepfool" \
-  --model_src_dir model_src/cifar10_challenge \
-  --ckpt_dir model_src/cifar10_challenge/models/nat \
-  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_MULTI_DEEPFOOL" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 --df_max_iter 1 \
-  --epsilon 0.03137254901960784 --alpha 0.00784313725490196 \
-  --df_overshoot 0.02 --init_sanity_plot
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
-# ------------------------------------------------------------------
-# CIFAR10 (adv)
-# ------------------------------------------------------------------
-run "cifar10_adv_random" \
+run "loss_curves.py" "lc_cifar10_adv_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
-  --dataset cifar10 \
-  --init random --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 \
-  --epsilon 0.03137254901960784 --alpha 0.00784313725490196
-
-run "cifar10_adv_multi_deepfool" \
-  --model_src_dir model_src/cifar10_challenge \
-  --ckpt_dir model_src/cifar10_challenge/models/adv \
-  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_MULTI_DEEPFOOL" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
-  --n_examples 5 \
-  --num_restarts 9 --total_iter 100 --df_max_iter 1 \
-  --epsilon 0.03137254901960784 --alpha 0.00784313725490196 \
-  --df_overshoot 0.02 --init_sanity_plot
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
+  --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
 echo "ALL DONE."
-

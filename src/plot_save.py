@@ -12,12 +12,13 @@ from src.logging_config import LOGGER
 
 def save_panel_arrays(
     out_dir: str,
+    exp_name: str,
     base: str,
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
     """Save panel arrays (losses, preds, corrects) to arrays/ subdirectory."""
-    arrays_dir = os.path.join(out_dir, "arrays")
+    arrays_dir = os.path.join(out_dir, "arrays", exp_name)
     os.makedirs(arrays_dir, exist_ok=True)
 
     np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_losses.npy"), panel.pgd.losses)
@@ -30,13 +31,14 @@ def save_panel_arrays(
 
 def save_panel_images(
     out_dir: str,
+    exp_name: str,
     base: str,
     dataset: str,
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
     """Save panel images (x_nat, x_adv, delta) to images/ subdirectory."""
-    images_dir = os.path.join(out_dir, "images")
+    images_dir = os.path.join(out_dir, "images", exp_name)
     os.makedirs(images_dir, exist_ok=True)
 
     nat_png = os.path.join(images_dir, f"{base}_p{panel_index}_x_nat.png")
@@ -117,11 +119,12 @@ def format_panel_metadata(panel: ExamplePanel, panel_index: int, args: argparse.
 
 def save_panel_outputs(
     out_dir: str,
+    exp_name: str,
     base: str,
     dataset: str,
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
     """Save panel arrays and images to subdirectories."""
-    save_panel_arrays(out_dir, base, panel_index, panel)
-    save_panel_images(out_dir, base, dataset, panel_index, panel)
+    save_panel_arrays(out_dir, exp_name, base, panel_index, panel)
+    save_panel_images(out_dir, exp_name, base, dataset, panel_index, panel)

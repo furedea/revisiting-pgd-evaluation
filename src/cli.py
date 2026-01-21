@@ -13,6 +13,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--model_src_dir", required=True)
     ap.add_argument("--ckpt_dir", required=True)
     ap.add_argument("--out_dir", required=True)
+    ap.add_argument("--exp_name", required=True, help="Experiment name for subdirectory")
 
     ap.add_argument("--start_idx", type=int, default=0)
     ap.add_argument("--n_examples", type=int, default=1)

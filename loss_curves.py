@@ -733,11 +733,12 @@ def choose_show_restart(pgd_result: PGDBatchResult) -> int:
 # ============================================================
 def save_panel_arrays(
     out_dir: str,
+    exp_name: str,
     base: str,
     panel_index: int,
     panel: ExamplePanel,
 ) -> None:
-    arrays_dir = os.path.join(out_dir, "arrays")
+    arrays_dir = os.path.join(out_dir, "arrays", exp_name)
     os.makedirs(arrays_dir, exist_ok=True)
 
     np.save(os.path.join(arrays_dir, f"{base}_p{panel_index}_losses.npy"), panel.pgd.losses)
@@ -1130,6 +1131,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--model_src_dir", required=True)
     ap.add_argument("--ckpt_dir", required=True)
     ap.add_argument("--out_dir", required=True)
+    ap.add_argument("--exp_name", required=True, help="Experiment name for subdirectory")
 
     ap.add_argument("--dataset", choices=["mnist", "cifar10"], required=True)
     ap.add_argument("--init", choices=["random", "multi_deepfool"], default="random")
@@ -1323,13 +1325,14 @@ def save_all_outputs(
     for i, panel in enumerate(panels, start=1):
         save_panel_arrays(
             out_dir=str(args.out_dir),
+            exp_name=str(args.exp_name),
             base=str(base),
             panel_index=int(i),
             panel=panel,
         )
 
     # Save unified metadata file
-    metadata_dir = os.path.join(args.out_dir, "metadata")
+    metadata_dir = os.path.join(args.out_dir, "metadata", args.exp_name)
     os.makedirs(metadata_dir, exist_ok=True)
     meta_txt = os.path.join(metadata_dir, f"{base}_meta.txt")
 
@@ -1367,7 +1370,7 @@ def render_figure(
     title: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> str:
-    figures_dir = os.path.join(args.out_dir, "figures")
+    figures_dir = os.path.join(args.out_dir, "figures", args.exp_name)
     os.makedirs(figures_dir, exist_ok=True)
     out_png = os.path.join(figures_dir, f"{base}.png")
     plot_panels(
