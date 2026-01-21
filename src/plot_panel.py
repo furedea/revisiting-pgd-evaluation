@@ -8,16 +8,16 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import ScalarFormatter
 
-from .dto import ExamplePanel
-from .logging_config import LOGGER
-from .plot_setup import (
+from src.dto import ExamplePanel
+from src.logging_config import LOGGER
+from src.plot_setup import (
     add_correctness_legend,
     add_sanity_legend,
     finalize_figure,
     setup_figure,
     should_show_sanity_row,
 )
-from .plot_sanity import plot_sanity_row
+from src.plot_sanity import plot_sanity_row
 
 
 def plot_single_panel(

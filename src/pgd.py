@@ -6,8 +6,8 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from .dto import ModelOps, PGDBatchResult
-from .math_utils import clip_to_unit_interval, project_linf
+from src.dto import ModelOps, PGDBatchResult
+from src.math_utils import clip_to_unit_interval, project_linf
 
 
 def add_jitter(rng: np.random.RandomState, x: np.ndarray, jitter: float) -> np.ndarray:

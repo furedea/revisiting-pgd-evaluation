@@ -7,21 +7,21 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-from .cli import format_base_name, format_title
-from .data_loader import load_test_data
-from .deepfool import build_deepfool_init
-from .dto import ExamplePanel, InitSanityMetrics, ModelOps
-from .logging_config import LOGGER
-from .math_utils import linf_distance
-from .model_loader import (
+from src.cli import format_base_name, format_title
+from src.data_loader import load_test_data
+from src.deepfool import build_deepfool_init
+from src.dto import ExamplePanel, InitSanityMetrics, ModelOps
+from src.logging_config import LOGGER
+from src.math_utils import linf_distance
+from src.model_loader import (
     create_tf_session,
     instantiate_model,
     load_model_module,
     restore_checkpoint,
 )
-from .pgd import choose_show_restart, run_pgd_batch
-from .plot_panel import plot_panels
-from .plot_save import save_panel_outputs
+from src.pgd import choose_show_restart, run_pgd_batch
+from src.plot_panel import plot_panels
+from src.plot_save import save_panel_outputs
 
 
 def print_clean_diagnostics(

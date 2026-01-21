@@ -5,8 +5,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .dto import ExamplePanel
-from .logging_config import LOGGER
+from src.dto import ExamplePanel
+from src.logging_config import LOGGER
 
 
 def save_panel_outputs(

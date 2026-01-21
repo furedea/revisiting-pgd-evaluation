@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import ScalarFormatter
 
-from .dto import ExamplePanel
+from src.dto import ExamplePanel
 
 
 def plot_sanity_row(

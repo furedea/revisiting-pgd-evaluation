@@ -8,7 +8,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from .dto import ExamplePanel
+from src.dto import ExamplePanel
 
 
 def should_show_sanity_row(

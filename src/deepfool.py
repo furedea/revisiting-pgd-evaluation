@@ -5,9 +5,9 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-from .dto import ModelOps
-from .logging_config import LOGGER
-from .math_utils import clip_to_unit_interval, project_linf, scale_to_linf_ball
+from src.dto import ModelOps
+from src.logging_config import LOGGER
+from src.math_utils import clip_to_unit_interval, project_linf, scale_to_linf_ball
 
 
 def deepfool_init_point(

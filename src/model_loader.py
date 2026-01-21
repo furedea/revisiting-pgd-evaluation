@@ -9,7 +9,7 @@ from typing import Any
 
 import tensorflow as tf
 
-from .logging_config import LOGGER
+from src.logging_config import LOGGER
 
 
 def add_sys_path(path: str) -> None:
