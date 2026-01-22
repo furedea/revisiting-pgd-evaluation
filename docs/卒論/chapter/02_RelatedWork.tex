@@ -1,7 +1,9 @@
 \chapter{関連研究}
+
 本章では本論文で扱うデータセット，及び敵対的攻撃手法について説明する．
 
 \section{データセット}
+
 本研究では，画像分類の代表的なベンチマークデータセットであるMNISTとCIFAR10を使用する．表\ref{table:datasets}に両データセットの概要を示す．
 
 \begin{table}[hbtp]
@@ -22,10 +24,12 @@
 \end{table}
 
 \subsection{MNIST}
+
 MNISTは手書き数字（0から9）の画像データセットであり，機械学習の入門的なベンチマークとして広く用いられている．各画像は$28 \times 28$ピクセルのグレースケール画像であり，ピクセル値は$[0, 1]$に正規化されている．
 
 \subsection{CIFAR10}
-CIFAR10は10種類の物体（飛行機，自動車，鳥，猫，鹿，犬，蛙，馬，船，トラック）の画像データセットである\cite{CIFAR10}．各画像は$32 \times 32$ピクセルの3チャネルカラー画像であり，MNISTと比較してより複雑な画像分類タスクを表現している．ラベルと物体の対応は以下の表\ref{table:CIFAR10}の様になっている．
+
+CIFAR10は10種類の物体（飛行機，自動車，鳥，猫，鹿，犬，蛙，馬，船，トラック）の画像データセットである\cite{CIFAR10}．各画像は$32 \times 32$ピクセルの3チャネルカラー画像であり，MNISTと比較してより複雑な画像分類タスクを表現している．ラベルと物体の対応は以下の表\ref{table:CIFAR10}のようになる．
 
 \begin{table}[hbtp]
   \caption{CIFAR10のラベルと物体の対応}
@@ -44,52 +48,65 @@ CIFAR10は10種類の物体（飛行機，自動車，鳥，猫，鹿，犬，�
 \end{table}
 
 \section{PGD攻撃}
+
 \label{sec:pgd}
-射影勾配降下法（Projected Gradient Descent; PGD）は，制約付き最適化問題を解くための標準的な反復手法である．Madryらはこの手法を敵対的サンプルの生成に適用し，PGD攻撃として定式化した\cite{PGD}．PGD攻撃は，制約付き最適化問題を反復的に解くことで，摂動の大きさに制限を設けながらモデルの損失を最大化する敵対的摂動を求める．
+
+敵対的サンプル$x_{\text{adv}}$は，入力画像$x$に敵対的摂動$\delta$を加えたものであり，式(\ref{eq:adv_sample})で表される．
+\begin{align}
+    x_{\text{adv}} = x + \delta
+    \label{eq:adv_sample}
+\end{align}
+
+Madryらは，制約付き最適化問題を解くための標準的な手法であった射影勾配降下法（Projected Gradient Descent; PGD）をこの敵対的サンプルの生成に適用し，PGD攻撃として定式化した\cite{PGD}．
 
 \subsection{問題設定}
-入力画像を$x \in \mathbb{R}^D$（$D$は入力次元数），正解ラベルを$y$，モデルを$f$，損失関数を$L(x, y)$とする．PGD攻撃は，摂動の$\ell_\infty$ノルムが$\varepsilon$以下という制約のもとで損失を最大化する，以下の式(\ref{eq:pgd_objective})で定義される問題を解く．
+
+損失関数$L(x, y)$は，モデルの出力$f(x)$と正解ラベル$y$の間の損失を表す．PGD攻撃は，敵対的摂動$\delta$の$\ell_\infty$ノルムが$\varepsilon$以下という制約のもとでこの損失を最大化するような，式(\ref{eq:pgd_objective})で定義される制約付き最適化問題を解く．
+
 \begin{align}
     \max_{\delta} L(x + \delta, y) \quad \text{s.t.} \quad \|\delta\|_\infty \leq \varepsilon
     \label{eq:pgd_objective}
 \end{align}
-ここで$\varepsilon > 0$は摂動の強さを制御するパラメータである．
+
+ここで$\varepsilon > 0$は摂動の強さを制御するパラメータであり，$\varepsilon$が大きいほどモデルを誤分類させる力が強くなる．ただし$\varepsilon$が大きすぎると，入力画像と別物と感じられる敵対的サンプルが作られる恐れがあり，同じ入力の小さな改変でモデルが誤分類するかどうかという議論が意味を成さなくなるため注意が必要である．
 
 \subsection{更新式}
-PGD攻撃では式(\ref{eq:pgd})に示す更新式を$T$回反復する．
+
+PGD攻撃では，以下に示す操作を$T$回反復する．$t$回目の反復における画像$x^t_{adv}$を分類器$f$に入力した場合の損失$L$を計算し，その符号成分のみを取り出す．そして画像$x^t$をその符号成分の方向に学習率$\alpha$の分だけ変化させて$t+1$回目の反復における画像$x^{t+1}_{adv}$を作成する．以上の操作を以下の式(\ref{eq:pgd})で表す．
+
 \begin{align}
-    x^{t+1}_{\text{adv}} = \Pi_{x + \mathcal{S}} \left( x^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t_{\text{adv}}, y) \right) \right)
+    x^{t+1}_{\text{adv}} = \Pi_{x + \mathcal{S}} \left( x^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t_{\text{adv}}, y) \right) \right) \quad (t = 0, 1, \ldots, T-1)
     \label{eq:pgd}
 \end{align}
-ここで，$\alpha$はステップサイズ（$0 < \alpha < \varepsilon$），$\text{sign}(\cdot)$は各成分の符号を取る関数，$\nabla_{x} L$は入力に関する損失の勾配である．また，$\mathcal{S} = \{\delta \in \mathbb{R}^D : \|\delta\|_\infty \leq \varepsilon\}$は許容される摂動の集合であり，$\Pi_{x + \mathcal{S}}(\cdot)$は集合$x + \mathcal{S}$への射影演算子である．
 
-$\ell_\infty$ノルム制約下での射影は，式(\ref{eq:projection})に示すように成分毎のクリッピングで実現される．
-\begin{align}
-    \left\{\Pi_{x + \mathcal{S}}(z)\right\}_i = \text{clip}(z_i, x_i - \varepsilon, x_i + \varepsilon)
-    \label{eq:projection}
-\end{align}
+ここで$\text{sign}(\cdot)$は各成分の符号を取る関数であり，$\Pi_{x + \mathcal{S}}(\cdot)$は射影演算子である．$\mathcal{S} = \{\delta \in \mathbb{R}^D : \|\delta\|_\infty \leq \varepsilon\}$は許容される摂動の集合であり，更新後の点が制約範囲$x + \mathcal{S}$を超えた場合，範囲内の最も近い点に射影される．
 
 \subsection{ランダム初期化}
-PGD攻撃には初期点$x^0_{\text{adv}}$の設定が必要である．入力点$x$から開始する方法もあるが，ランダム初期化PGDでは式(\ref{eq:random_init})に示すように制約範囲$x + \mathcal{S}$内の一様乱数点から開始する．
+PGD攻撃には初期点$x^0_{\text{adv}}$の設定が必要である．入力点$x$から開始する方法もあるが，ランダム初期化PGDでは，式(\ref{eq:random_init})に示すように，入力画像$x$にランダムな摂動を加えた点から開始する．
+
 \begin{align}
     x^0_{\text{adv}} = x + u, \quad u \sim \text{Uniform}(-\varepsilon, \varepsilon)^D
     \label{eq:random_init}
 \end{align}
-ランダム初期化により，複数の異なる初期点から攻撃を行うことで局所最適解への陥りを緩和できる．複数回の試行のうち最も損失が大きくなった敵対的サンプルを採用することが一般的である．
+
+ここで$D$は入力画像の次元数である．この初期点から式(\ref{eq:pgd})の更新を$T$回繰り返し，最終的に得られる$x^T_{\text{adv}}$が敵対的サンプルとなる．
+
+ランダム初期化により初期点が異なると到達する局所最適解も異なる可能性があるため，一つの入力画像に対して複数の異なる初期点から攻撃を行い，最も損失が大きくなった敵対的サンプルを採用することが一般的である．この複数回の試行をリスタートと呼ぶ．
 
 \section{DeepFool}
 \label{sec:deepfool}
-DeepFoolはMoosavi-Dezfooliらによって提案された敵対的サンプル生成手法であり，$\ell_2$ノルム最小の摂動を求めることを目的としている\cite{DeepFool}．
+DeepFool\cite{DeepFool}はMoosavi-Dezfooliらによって提案された敵対的攻撃手法であり，$\ell_2$ノルム最小の摂動を求めることを目的としている．
 
 \subsection{基本原理}
+
 DeepFoolは，ニューラルネットワークを現在の点の近傍で局所的に線形近似し，最も近いラベル境界へ向かう方向に摂動を更新する．分類器が線形であれば，各ラベルの決定境界は超平面で表されるため，境界までの最短摂動を解析的に導出できる．
 
 \subsection{線形近似とラベル境界}
-$t$回目の反復における点を$x_t$，モデルのロジット（softmax適用前の出力）を$Z(x) = (Z_1(x), \ldots, Z_K(x))$とする．ここで$K$はラベル数である．現在の予測ラベルを
+$t$回目の反復における点を$x_t$，モデルのロジット（活性化関数適用前の出力）を$Z(x) = (Z_1(x), \ldots, Z_K(x))$とする．ここで$K$はラベル数である．現在の予測ラベルを
 \begin{align}
     y_t = \arg\max_k Z_k(x_t)
 \end{align}
-とし，各ラベル$k \neq y_t$について，ロジットスコアの差を
+とし，各ラベル$k \neq y_t$について，ロジットのスコアの差を
 \begin{align}
     g_k(x) = Z_k(x) - Z_{y_t}(x)
 \end{align}
