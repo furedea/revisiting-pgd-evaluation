@@ -11,7 +11,6 @@ Usage:
 import argparse
 import os
 import re
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
@@ -21,16 +20,26 @@ import numpy as np
 matplotlib.use("Agg")
 
 
-@dataclass
 class LossData:
     """Container for loss data from a single experiment."""
 
-    filepath: str
-    dataset: str
-    model: str
-    init: str
-    panel_index: int
-    losses: np.ndarray  # shape: (restarts, iterations+1)
+    __slots__ = ("filepath", "dataset", "model", "init", "panel_index", "losses")
+
+    def __init__(
+        self,
+        filepath: str,
+        dataset: str,
+        model: str,
+        init: str,
+        panel_index: int,
+        losses: np.ndarray,
+    ) -> None:
+        self.filepath = filepath
+        self.dataset = dataset
+        self.model = model
+        self.init = init
+        self.panel_index = panel_index
+        self.losses = losses  # shape: (restarts, iterations+1)
 
     @property
     def num_restarts(self) -> int:
