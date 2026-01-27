@@ -568,8 +568,8 @@ def main() -> None:
     parser.add_argument(
         "--out_dir",
         type=str,
-        default=None,
-        help="Output directory for figures (default: input_dir/../convergence_analysis)",
+        default="/work/outputs",
+        help="Base output directory (default: /work/outputs)",
     )
     parser.add_argument(
         "--threshold",
@@ -579,12 +579,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Set output directory
-    if args.out_dir is None:
-        args.out_dir = os.path.join(
-            os.path.dirname(args.input_dir.rstrip("/")), "convergence_analysis"
-        )
-    os.makedirs(args.out_dir, exist_ok=True)
+    # Set output directory: out_dir/convergence_analysis/threshold_{threshold}/
+    threshold_str = f"threshold_{args.threshold:.2f}".replace(".", "_")
+    result_dir = os.path.join(args.out_dir, "convergence_analysis", threshold_str)
+    os.makedirs(result_dir, exist_ok=True)
 
     # Load data
     data_list = load_loss_files(args.input_dir)
@@ -600,24 +598,24 @@ def main() -> None:
 
     # Save markdown summary
     save_markdown_summary(
-        stats, args.threshold, os.path.join(args.out_dir, "convergence_summary.md")
+        stats, args.threshold, os.path.join(result_dir, "convergence_summary.md")
     )
 
     # Generate plots
     plot_normalized_loss_curves(
-        data_list, os.path.join(args.out_dir, "normalized_loss_curves.png")
+        data_list, os.path.join(result_dir, "normalized_loss_curves.png")
     )
     plot_convergence_histogram(
-        stats, os.path.join(args.out_dir, "convergence_histogram.png"), args.threshold
+        stats, os.path.join(result_dir, "convergence_histogram.png"), args.threshold
     )
     plot_convergence_cdf(
-        stats, os.path.join(args.out_dir, "convergence_cdf.png"), args.threshold
+        stats, os.path.join(result_dir, "convergence_cdf.png"), args.threshold
     )
     plot_mean_loss_curves_overlay(
-        data_list, os.path.join(args.out_dir, "mean_loss_overlay.png")
+        data_list, os.path.join(result_dir, "mean_loss_overlay.png")
     )
 
-    print(f"\n[DONE] Results saved to {args.out_dir}")
+    print(f"\n[DONE] Results saved to {result_dir}")
 
 
 if __name__ == "__main__":
