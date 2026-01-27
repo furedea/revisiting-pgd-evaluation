@@ -656,11 +656,12 @@ def plot_convergence_histogram(
         nc_x = n_bins + idx * bar_width - (n_models - 1) * bar_width / 2
         ax.bar(nc_x, nc_count, width=bar_width, color=colors[idx], alpha=0.8)
 
-    # Set x-axis labels
-    x_tick_positions = list(range(n_bins)) + [n_bins]
-    x_tick_labels = [str(i) for i in range(n_bins)] + ["NC"]
+    # Set x-axis labels (every 10 iterations + NC)
+    step = 10
+    x_tick_positions = list(range(0, n_bins, step)) + [n_bins]
+    x_tick_labels = [str(i) for i in range(0, n_bins, step)] + ["NC"]
     ax.set_xticks(x_tick_positions)
-    ax.set_xticklabels(x_tick_labels, fontsize=8)
+    ax.set_xticklabels(x_tick_labels)
 
     ax.set_xlabel("Iteration to reach threshold (NC = Not Converged)")
     ax.set_ylabel("Count")
@@ -708,11 +709,12 @@ def plot_single_model_histogram(
     # Plot NC bin
     ax.bar(n_bins, nc_count, width=0.8, color="salmon", alpha=0.8)
 
-    # Set x-axis labels
-    x_tick_positions = list(range(n_bins)) + [n_bins]
-    x_tick_labels = [str(i) for i in range(n_bins)] + ["NC"]
+    # Set x-axis labels (every 10 iterations + NC)
+    step = 10
+    x_tick_positions = list(range(0, n_bins, step)) + [n_bins]
+    x_tick_labels = [str(i) for i in range(0, n_bins, step)] + ["NC"]
     ax.set_xticks(x_tick_positions)
-    ax.set_xticklabels(x_tick_labels, fontsize=8)
+    ax.set_xticklabels(x_tick_labels)
 
     ax.set_xlabel("Iteration to reach threshold (NC = Not Converged)")
     ax.set_ylabel("Count")
@@ -750,22 +752,41 @@ def plot_convergence_cdf(
     colors = plt.cm.tab10(np.linspace(0, 1, len(models)))
 
     for idx, model in enumerate(models):
-        iters = np.sort(all_iters_by_model[model])
-        cdf = np.arange(1, len(iters) + 1) / len(iters)
-        ax.step(iters, cdf, where="post", label=model, color=colors[idx], linewidth=2)
+        iters = all_iters_by_model[model]
+        converged = iters[iters != NOT_CONVERGED]  # Exclude NC
+        if len(converged) == 0:
+            continue
+        sorted_iters = np.sort(converged)
+        n_total = len(iters)
+        # CDF: fraction of total samples converged by iteration N
+        cdf = np.arange(1, len(sorted_iters) + 1) / n_total
+        conv_rate = len(converged) / n_total * 100
+        ax.step(
+            sorted_iters,
+            cdf,
+            where="post",
+            label=f"{model} ({conv_rate:.0f}%)",
+            color=colors[idx],
+            linewidth=2,
+        )
 
-    # Combined
-    all_combined = np.sort(np.concatenate(list(all_iters_by_model.values())))
-    cdf_combined = np.arange(1, len(all_combined) + 1) / len(all_combined)
-    ax.step(
-        all_combined,
-        cdf_combined,
-        where="post",
-        label="ALL",
-        color="black",
-        linewidth=2,
-        linestyle="--",
-    )
+    # Combined (excluding NC)
+    all_iters_flat = np.concatenate(list(all_iters_by_model.values()))
+    all_converged = all_iters_flat[all_iters_flat != NOT_CONVERGED]
+    n_total_all = len(all_iters_flat)
+    if len(all_converged) > 0:
+        all_sorted = np.sort(all_converged)
+        cdf_combined = np.arange(1, len(all_sorted) + 1) / n_total_all
+        conv_rate_all = len(all_converged) / n_total_all * 100
+        ax.step(
+            all_sorted,
+            cdf_combined,
+            where="post",
+            label=f"ALL ({conv_rate_all:.0f}%)",
+            color="black",
+            linewidth=2,
+            linestyle="--",
+        )
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fraction converged")
