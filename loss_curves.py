@@ -565,22 +565,17 @@ def run_multi_deepfool_init_pgd(
 
     Like src, records only PGD iterations (not DeepFool iterations):
     - iter 0: DeepFool endpoint (PGD start point)
-    - iter 1 to pgd_iter: PGD iterations
+    - iter 1 to total_iter: PGD iterations
 
-    Returns PGDBatchResult with losses/preds of shape (num_restarts, pgd_iter+1).
+    Returns PGDBatchResult with losses/preds of shape (num_restarts, total_iter+1).
     """
     restarts = int(num_restarts)
     df_iter = int(df_max_iter)
-    pgd_iter = int(total_iter) - df_iter
-
-    if pgd_iter < 0:
-        raise ValueError(
-            f"total_iter ({total_iter}) must be >= df_max_iter ({df_max_iter})"
-        )
+    pgd_iter = int(total_iter)
 
     LOGGER.info(
         f"[multi_deepfool_pgd] restarts={restarts} df_iter={df_iter} "
-        f"pgd_iter={pgd_iter} total_iter={total_iter}"
+        f"pgd_iter={pgd_iter}"
     )
 
     # Initialize arrays for PGD trajectory only (like src)
