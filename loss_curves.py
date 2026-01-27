@@ -563,12 +563,11 @@ def run_multi_deepfool_init_pgd(
 ) -> PGDBatchResult:
     """Run multi_deepfool followed by PGD.
 
-    total_iter is the total number of iterations:
-    - iter 0: x_nat (initial point)
-    - iter 1 to df_max_iter: multi_deepfool iterations
-    - iter df_max_iter+1 to total_iter: PGD iterations
+    Like src, records only PGD iterations (not DeepFool iterations):
+    - iter 0: DeepFool endpoint (PGD start point)
+    - iter 1 to pgd_iter: PGD iterations
 
-    Returns PGDBatchResult with losses/preds of shape (num_restarts, total_iter+1).
+    Returns PGDBatchResult with losses/preds of shape (num_restarts, pgd_iter+1).
     """
     restarts = int(num_restarts)
     df_iter = int(df_max_iter)
@@ -584,9 +583,9 @@ def run_multi_deepfool_init_pgd(
         f"pgd_iter={pgd_iter} total_iter={total_iter}"
     )
 
-    # Initialize arrays for full trajectory
-    losses = np.zeros((restarts, int(total_iter) + 1), dtype=np.float32)
-    preds = np.zeros((restarts, int(total_iter) + 1), dtype=np.int64)
+    # Initialize arrays for PGD trajectory only (like src)
+    losses = np.zeros((restarts, pgd_iter + 1), dtype=np.float32)
+    preds = np.zeros((restarts, pgd_iter + 1), dtype=np.int64)
 
     # Run multi_deepfool with trace
     x_advs, df_losses, df_preds = multi_deepfool_with_trace(
@@ -600,17 +599,17 @@ def run_multi_deepfool_init_pgd(
         eps=float(eps),
     )
 
-    # Copy multi_deepfool trajectory (iter 0 to df_max_iter)
-    losses[:, : df_iter + 1] = df_losses
-    preds[:, : df_iter + 1] = df_preds
-
     # Prepare batch for PGD
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
     x_nat_batch = np.repeat(x_nat.astype(np.float32), restarts, axis=0)
 
-    # Stack x_advs into batch (this is DeepFool endpoint, before PGD)
+    # Stack x_advs into batch (this is DeepFool endpoint, PGD start point)
     x_df_endpoints = np.concatenate([x.astype(np.float32) for x in x_advs], axis=0)
     x_adv = x_df_endpoints.copy()
+
+    # Record iter 0: DeepFool endpoint (from multi_deepfool_with_trace)
+    losses[:, 0] = df_losses[:, -1]
+    preds[:, 0] = df_preds[:, -1]
 
     # Run PGD from multi_deepfool endpoints
     for t in tqdm(range(1, pgd_iter + 1), desc="PGD", unit="iter", leave=False):
@@ -622,8 +621,8 @@ def run_multi_deepfool_init_pgd(
             [ops.per_ex_loss_op, ops.y_pred_op],
             feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch},
         )
-        losses[:, df_iter + t] = lt.astype(np.float32)
-        preds[:, df_iter + t] = pt.astype(np.int64)
+        losses[:, t] = lt.astype(np.float32)
+        preds[:, t] = pt.astype(np.int64)
 
     corrects = (preds == y_batch[:, None]).astype(bool)
 
@@ -815,8 +814,6 @@ def plot_panels(
     init_sanity_plot: bool,
     eps: float,
     init_mode: str = "random",
-    df_max_iter: int = 0,
-    total_iter: int = 100,
 ) -> None:
     num_panels = int(len(panels))
     if num_panels < 1 or num_panels > 5:
@@ -856,12 +853,6 @@ def plot_panels(
     for col, panel in enumerate(panels):
         losses = panel.pgd.losses
         corrects = panel.pgd.corrects
-
-        # multi_deepfool: slice out DeepFool portion, display PGD part only (iter 0 = DeepFool endpoint)
-        if init_mode == "multi_deepfool" and df_max_iter > 0:
-            losses = losses[:, df_max_iter:]
-            corrects = corrects[:, df_max_iter:]
-
         restarts, iter_plus1 = losses.shape
         xs = np.arange(iter_plus1)
 
@@ -890,9 +881,6 @@ def plot_panels(
         ax1.ticklabel_format(axis="y", style="plain", useOffset=False)
         ax1.yaxis.get_offset_text().set_visible(False)
 
-        # Fix x-axis range to total_iter for consistent comparison
-        ax1.set_xlim(0, total_iter)
-
         ax2 = fig.add_subplot(gs[1, col], sharex=ax1)
         ax2.imshow(
             corrects.astype(np.int8),
@@ -902,7 +890,6 @@ def plot_panels(
             cmap=cmap,
             vmin=0,
             vmax=1,
-            extent=[0, iter_plus1 - 1, -0.5, restarts - 0.5],
         )
         ax2.set_xlabel("Iterations")
         ax2.set_ylabel("restart (run)" if col == 0 else "")
@@ -1401,8 +1388,6 @@ def render_figure(
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "multi_deepfool"),
         eps=float(args.epsilon),
         init_mode=str(args.init),
-        df_max_iter=int(args.df_max_iter) if args.init == "multi_deepfool" else 0,
-        total_iter=int(args.total_iter),
     )
     return out_png
 
