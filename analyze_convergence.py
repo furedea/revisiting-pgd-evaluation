@@ -19,6 +19,13 @@ import numpy as np
 
 matplotlib.use("Agg")
 
+# Fixed ordering for consistent plots
+MODEL_ORDER = ["nat", "nat_and_adv", "weak_adv", "adv"]  # top to bottom
+INIT_ORDER = ["random", "deepfool", "multi_deepfool"]  # left to right
+
+# Marker for unconverged samples
+NOT_CONVERGED = -1
+
 
 class LossData:
     """Container for loss data from a single experiment."""
@@ -144,27 +151,39 @@ def load_loss_files(input_dir: str) -> List[LossData]:
 def compute_convergence_iteration(
     losses: np.ndarray, threshold: float = 0.99
 ) -> np.ndarray:
-    """Compute iteration where loss reaches threshold * final_loss.
+    """Compute iteration where normalized loss progress reaches threshold.
+
+    Uses normalized progress: (loss - initial) / (final - initial)
+    This ensures we measure progress from initial state toward final state.
 
     Args:
         losses: shape (restarts, iterations+1)
-        threshold: fraction of final loss to consider "converged"
+        threshold: fraction of progress to consider "converged" (0 to 1)
 
     Returns:
         convergence_iters: shape (restarts,) - iteration index where converged
+            0-99: converged at that iteration
+            100: converged at final iteration (if num_iterations=100)
+            -1 (NOT_CONVERGED): never reached threshold
     """
-    final_loss = losses[:, -1:]  # shape (restarts, 1)
-    target = final_loss * threshold
+    initial = losses[:, :1]  # shape (restarts, 1)
+    final = losses[:, -1:]  # shape (restarts, 1)
 
-    # Find first iteration where loss >= target
-    reached = losses >= target  # shape (restarts, iterations+1)
+    # Compute normalized progress
+    denom = final - initial
+    denom = np.where(np.abs(denom) < 1e-12, 1e-12, denom)
+    progress = (losses - initial) / denom
+
+    # Find first iteration where progress >= threshold
+    reached = progress >= threshold  # shape (restarts, iterations+1)
 
     # argmax on bool array finds first True
     convergence_iters = np.argmax(reached, axis=1)
 
-    # Handle case where never reached (shouldn't happen if threshold < 1)
+    # Handle case where never reached threshold
     never_reached = ~np.any(reached, axis=1)
-    convergence_iters[never_reached] = losses.shape[1] - 1
+    convergence_iters = convergence_iters.astype(np.int32)
+    convergence_iters[never_reached] = NOT_CONVERGED
 
     return convergence_iters
 
@@ -225,39 +244,69 @@ def print_convergence_summary(
     stats: Dict[str, Dict[str, np.ndarray]], threshold: float
 ) -> None:
     """Print summary table of convergence statistics."""
-    print(f"\n{'=' * 70}")
-    print(f"Convergence Summary (threshold={threshold:.0%} of final loss)")
-    print(f"{'=' * 70}")
+    print(f"\n{'=' * 80}")
+    print(f"Convergence Summary (threshold={threshold:.0%} of normalized progress)")
+    print(f"{'=' * 80}")
 
     all_iters = []
 
-    for model in sorted(stats.keys()):
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
         print(f"\n[{model}]")
-        for init in sorted(stats[model].keys()):
+        for init in INIT_ORDER:
+            if init not in stats[model]:
+                continue
             iters = stats[model][init]
             all_iters.extend(iters.tolist())
 
-            print(
-                f"  {init:20s}: "
-                f"mean={np.mean(iters):5.1f}, "
-                f"median={np.median(iters):5.1f}, "
-                f"p95={np.percentile(iters, 95):5.1f}, "
-                f"max={np.max(iters):5.0f}, "
-                f"n={len(iters)}"
-            )
+            n_total = len(iters)
+            converged = iters[iters != NOT_CONVERGED]
+            n_converged = len(converged)
+            n_unconverged = n_total - n_converged
+            conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+
+            if n_converged > 0:
+                print(
+                    f"  {init:20s}: "
+                    f"conv={conv_rate:5.1f}%, "
+                    f"mean={np.mean(converged):5.1f}, "
+                    f"median={np.median(converged):5.1f}, "
+                    f"p95={np.percentile(converged, 95):5.1f}, "
+                    f"max={np.max(converged):5.0f}, "
+                    f"n={n_total}, "
+                    f"NC={n_unconverged}"
+                )
+            else:
+                print(
+                    f"  {init:20s}: "
+                    f"conv={conv_rate:5.1f}%, "
+                    f"n={n_total}, "
+                    f"NC={n_unconverged}"
+                )
 
     if all_iters:
         all_iters = np.array(all_iters)
-        print(f"\n{'=' * 70}")
+        converged = all_iters[all_iters != NOT_CONVERGED]
+        n_total = len(all_iters)
+        n_converged = len(converged)
+        conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+
+        print(f"\n{'=' * 80}")
         print("[ALL MODELS COMBINED]")
-        print(
-            f"  mean={np.mean(all_iters):5.1f}, "
-            f"median={np.median(all_iters):5.1f}, "
-            f"p95={np.percentile(all_iters, 95):5.1f}, "
-            f"max={np.max(all_iters):5.0f}, "
-            f"n={len(all_iters)}"
-        )
-        print(f"{'=' * 70}")
+        if n_converged > 0:
+            print(
+                f"  conv={conv_rate:5.1f}%, "
+                f"mean={np.mean(converged):5.1f}, "
+                f"median={np.median(converged):5.1f}, "
+                f"p95={np.percentile(converged, 95):5.1f}, "
+                f"max={np.max(converged):5.0f}, "
+                f"n={n_total}, "
+                f"NC={n_total - n_converged}"
+            )
+        else:
+            print(f"  conv={conv_rate:5.1f}%, n={n_total}, NC={n_total - n_converged}")
+        print(f"{'=' * 80}")
 
 
 def generate_markdown_summary(
@@ -266,86 +315,173 @@ def generate_markdown_summary(
     """Generate markdown formatted summary.
 
     Returns markdown string with:
+    - Convergence statistics table
     - Detailed table (model × init breakdown)
     - Summary table (model-level aggregation)
     - Overall summary
     """
     lines = []
-    lines.append(f"# Convergence Analysis Summary")
-    lines.append(f"")
-    lines.append(f"**Threshold**: {threshold:.0%} of final loss")
-    lines.append(f"")
+    lines.append("# Convergence Analysis Summary")
+    lines.append("")
+    lines.append(f"**Threshold**: {threshold:.0%} of normalized progress")
+    lines.append("")
 
-    # Detailed table: model × init
-    lines.append(f"## Detailed Results (by model and init)")
-    lines.append(f"")
-    lines.append(f"| Model | Init | Mean | Median | P95 | Max | N |")
-    lines.append(f"|-------|------|-----:|-------:|----:|----:|--:|")
+    # Convergence statistics table
+    lines.append("## Convergence Statistics")
+    lines.append("")
+    lines.append("| Model | Convergence Rate | Mean Iter (converged) | Unconverged |")
+    lines.append("|-------|----------------:|----------------------:|------------:|")
 
-    all_iters = []
-    for model in sorted(stats.keys()):
-        for init in sorted(stats[model].keys()):
-            iters = stats[model][init]
-            all_iters.extend(iters.tolist())
-            lines.append(
-                f"| {model} | {init} | "
-                f"{np.mean(iters):.1f} | "
-                f"{np.median(iters):.1f} | "
-                f"{np.percentile(iters, 95):.1f} | "
-                f"{np.max(iters):.0f} | "
-                f"{len(iters)} |"
-            )
-
-    lines.append(f"")
-
-    # Model-level summary table
-    lines.append(f"## Model-level Summary")
-    lines.append(f"")
-    lines.append(f"| Model | Mean | Median | P95 | Max | N |")
-    lines.append(f"|-------|-----:|-------:|----:|----:|--:|")
-
-    for model in sorted(stats.keys()):
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
         model_iters = []
         for init in stats[model]:
             model_iters.extend(stats[model][init].tolist())
         model_iters = np.array(model_iters)
+
+        n_total = len(model_iters)
+        converged = model_iters[model_iters != NOT_CONVERGED]
+        n_converged = len(converged)
+        n_unconverged = n_total - n_converged
+        conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+        mean_conv = np.mean(converged) if n_converged > 0 else float("nan")
+
         lines.append(
             f"| {model} | "
-            f"{np.mean(model_iters):.1f} | "
-            f"{np.median(model_iters):.1f} | "
-            f"{np.percentile(model_iters, 95):.1f} | "
-            f"{np.max(model_iters):.0f} | "
-            f"{len(model_iters)} |"
+            f"{conv_rate:.1f}% | "
+            f"{mean_conv:.1f} | "
+            f"{n_unconverged} |"
         )
 
-    lines.append(f"")
+    lines.append("")
+
+    # Detailed table: model × init
+    lines.append("## Detailed Results (by model and init)")
+    lines.append("")
+    lines.append(
+        "| Model | Init | Conv Rate | Mean | Median | P95 | Max | N | Unconverged |"
+    )
+    lines.append(
+        "|-------|------|----------:|-----:|-------:|----:|----:|--:|------------:|"
+    )
+
+    all_iters = []
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
+        for init in INIT_ORDER:
+            if init not in stats[model]:
+                continue
+            iters = stats[model][init]
+            all_iters.extend(iters.tolist())
+
+            n_total = len(iters)
+            converged = iters[iters != NOT_CONVERGED]
+            n_converged = len(converged)
+            n_unconverged = n_total - n_converged
+            conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+
+            if n_converged > 0:
+                lines.append(
+                    f"| {model} | {init} | "
+                    f"{conv_rate:.1f}% | "
+                    f"{np.mean(converged):.1f} | "
+                    f"{np.median(converged):.1f} | "
+                    f"{np.percentile(converged, 95):.1f} | "
+                    f"{np.max(converged):.0f} | "
+                    f"{n_total} | "
+                    f"{n_unconverged} |"
+                )
+            else:
+                lines.append(
+                    f"| {model} | {init} | "
+                    f"{conv_rate:.1f}% | "
+                    f"N/A | N/A | N/A | N/A | "
+                    f"{n_total} | "
+                    f"{n_unconverged} |"
+                )
+
+    lines.append("")
+
+    # Model-level summary table
+    lines.append("## Model-level Summary")
+    lines.append("")
+    lines.append("| Model | Conv Rate | Mean | Median | P95 | Max | N |")
+    lines.append("|-------|----------:|-----:|-------:|----:|----:|--:|")
+
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
+        model_iters = []
+        for init in stats[model]:
+            model_iters.extend(stats[model][init].tolist())
+        model_iters = np.array(model_iters)
+
+        n_total = len(model_iters)
+        converged = model_iters[model_iters != NOT_CONVERGED]
+        n_converged = len(converged)
+        conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+
+        if n_converged > 0:
+            lines.append(
+                f"| {model} | "
+                f"{conv_rate:.1f}% | "
+                f"{np.mean(converged):.1f} | "
+                f"{np.median(converged):.1f} | "
+                f"{np.percentile(converged, 95):.1f} | "
+                f"{np.max(converged):.0f} | "
+                f"{n_total} |"
+            )
+        else:
+            lines.append(
+                f"| {model} | "
+                f"{conv_rate:.1f}% | "
+                f"N/A | N/A | N/A | N/A | "
+                f"{n_total} |"
+            )
+
+    lines.append("")
 
     # Overall summary
     if all_iters:
         all_iters = np.array(all_iters)
-        lines.append(f"## Overall Summary (All Models Combined)")
-        lines.append(f"")
-        lines.append(f"| Metric | Value |")
-        lines.append(f"|--------|------:|")
-        lines.append(f"| Mean | {np.mean(all_iters):.1f} |")
-        lines.append(f"| Median | {np.median(all_iters):.1f} |")
-        lines.append(f"| P95 | {np.percentile(all_iters, 95):.1f} |")
-        lines.append(f"| Max | {np.max(all_iters):.0f} |")
-        lines.append(f"| Total samples | {len(all_iters)} |")
-        lines.append(f"")
+        converged = all_iters[all_iters != NOT_CONVERGED]
+        n_total = len(all_iters)
+        n_converged = len(converged)
+        conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+
+        lines.append("## Overall Summary (All Models Combined)")
+        lines.append("")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|------:|")
+        lines.append(f"| Convergence Rate | {conv_rate:.1f}% |")
+        lines.append(f"| Total samples | {n_total} |")
+        lines.append(f"| Converged | {n_converged} |")
+        lines.append(f"| Unconverged | {n_total - n_converged} |")
+
+        if n_converged > 0:
+            lines.append(f"| Mean (converged) | {np.mean(converged):.1f} |")
+            lines.append(f"| Median (converged) | {np.median(converged):.1f} |")
+            lines.append(f"| P95 (converged) | {np.percentile(converged, 95):.1f} |")
+            lines.append(f"| Max (converged) | {np.max(converged):.0f} |")
+        lines.append("")
 
         # Recommendation
-        p95 = np.percentile(all_iters, 95)
-        p99 = np.percentile(all_iters, 99)
-        lines.append(f"## Recommendation")
-        lines.append(f"")
-        lines.append(
-            f"- **95% of samples** reach {threshold:.0%} of final loss by iteration **{p95:.0f}**"
-        )
-        lines.append(
-            f"- **99% of samples** reach {threshold:.0%} of final loss by iteration **{p99:.0f}**"
-        )
-        lines.append(f"")
+        if n_converged > 0:
+            p95 = np.percentile(converged, 95)
+            p99 = np.percentile(converged, 99)
+            lines.append("## Recommendation")
+            lines.append("")
+            lines.append(
+                f"- **95% of converged samples** reach {threshold:.0%} "
+                f"of progress by iteration **{p95:.0f}**"
+            )
+            lines.append(
+                f"- **99% of converged samples** reach {threshold:.0%} "
+                f"of progress by iteration **{p99:.0f}**"
+            )
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -361,11 +497,28 @@ def save_markdown_summary(
 
 
 def plot_normalized_loss_curves(
-    data_list: List[LossData], out_path: str, max_curves_per_group: int = 50
+    data_list: List[LossData],
+    out_path: str,
+    threshold: float,
+    max_curves_per_group: int = 50,
 ) -> None:
-    """Plot normalized loss curves grouped by model."""
-    models = sorted(set(d.model for d in data_list))
-    inits = sorted(set(d.init for d in data_list))
+    """Plot normalized loss curves grouped by model.
+
+    Args:
+        data_list: List of LossData objects
+        out_path: Output file path
+        threshold: Convergence threshold for horizontal line
+        max_curves_per_group: Maximum curves to plot per subplot
+    """
+    # Use fixed ordering
+    available_models = set(d.model for d in data_list)
+    available_inits = set(d.init for d in data_list)
+    models = [m for m in MODEL_ORDER if m in available_models]
+    inits = [i for i in INIT_ORDER if i in available_inits]
+
+    if not models or not inits:
+        print("[WARN] No data for normalized loss curves")
+        return
 
     fig, axes = plt.subplots(
         len(models), len(inits), figsize=(5 * len(inits), 4 * len(models)), squeeze=False
@@ -411,7 +564,21 @@ def plot_normalized_loss_curves(
             ax.set_ylabel("Normalized Loss")
             ax.set_ylim(-0.1, 1.1)
             ax.axhline(y=1.0, color="gray", linestyle="--", alpha=0.5)
-            ax.axhline(y=0.99, color="orange", linestyle="--", alpha=0.5, label="99%")
+            ax.axhline(
+                y=threshold,
+                color="orange",
+                linestyle="--",
+                alpha=0.5,
+                label=f"{threshold:.0%}",
+            )
+
+            # Add threshold to y-axis ticks
+            yticks = list(ax.get_yticks())
+            if threshold not in yticks:
+                yticks.append(threshold)
+                yticks = sorted([y for y in yticks if -0.1 <= y <= 1.1])
+                ax.set_yticks(yticks)
+
             if i == 0 and j == 0:
                 ax.legend(fontsize=8)
 
@@ -424,10 +591,16 @@ def plot_normalized_loss_curves(
 def plot_convergence_histogram(
     stats: Dict[str, Dict[str, np.ndarray]], out_path: str, threshold: float
 ) -> None:
-    """Plot histogram of convergence iterations."""
-    # Collect all iterations
+    """Plot histogram of convergence iterations with side-by-side bars.
+
+    Includes an "NC" (Not Converged) bin at the right end for samples
+    that never reached the threshold.
+    """
+    # Collect all iterations using fixed model order
     all_iters_by_model = {}
-    for model in stats:
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
         model_iters = []
         for init in stats[model]:
             model_iters.extend(stats[model][init].tolist())
@@ -438,32 +611,122 @@ def plot_convergence_histogram(
         print("[WARN] No data for histogram")
         return
 
-    models = sorted(all_iters_by_model.keys())
-    fig, ax = plt.subplots(figsize=(10, 6))
+    models = [m for m in MODEL_ORDER if m in all_iters_by_model]
+    n_models = len(models)
+    fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Determine bin range
-    all_vals = np.concatenate(list(all_iters_by_model.values()))
-    max_iter = int(np.max(all_vals))
-    bins = np.arange(0, max_iter + 2) - 0.5
+    # Determine bin range (excluding NOT_CONVERGED=-1)
+    all_converged = []
+    for m in models:
+        converged = all_iters_by_model[m][all_iters_by_model[m] != NOT_CONVERGED]
+        all_converged.extend(converged.tolist())
 
-    for model in models:
-        ax.hist(
-            all_iters_by_model[model],
-            bins=bins,
-            alpha=0.5,
-            label=f"{model} (n={len(all_iters_by_model[model])})",
+    if all_converged:
+        max_iter = int(np.max(all_converged))
+    else:
+        max_iter = 100
+
+    # Create bins: 0, 1, 2, ..., max_iter, NC
+    bin_edges = list(range(max_iter + 2))  # 0 to max_iter+1
+    n_bins = len(bin_edges) - 1
+    bar_width = 0.8 / n_models
+
+    colors = plt.cm.tab10(np.linspace(0, 1, n_models))
+
+    for idx, model in enumerate(models):
+        iters = all_iters_by_model[model]
+        converged_iters = iters[iters != NOT_CONVERGED]
+        nc_count = np.sum(iters == NOT_CONVERGED)
+
+        # Compute histogram for converged samples
+        counts, _ = np.histogram(converged_iters, bins=bin_edges)
+
+        # Plot side-by-side bars
+        x_positions = np.arange(n_bins) + idx * bar_width - (n_models - 1) * bar_width / 2
+        ax.bar(
+            x_positions,
+            counts,
+            width=bar_width,
+            color=colors[idx],
+            alpha=0.8,
+            label=f"{model} (n={len(iters)})",
         )
 
-    ax.set_xlabel("Iteration to reach threshold")
+        # Plot NC bin at the right
+        nc_x = n_bins + idx * bar_width - (n_models - 1) * bar_width / 2
+        ax.bar(nc_x, nc_count, width=bar_width, color=colors[idx], alpha=0.8)
+
+    # Set x-axis labels
+    x_tick_positions = list(range(n_bins)) + [n_bins]
+    x_tick_labels = [str(i) for i in range(n_bins)] + ["NC"]
+    ax.set_xticks(x_tick_positions)
+    ax.set_xticklabels(x_tick_labels, fontsize=8)
+
+    ax.set_xlabel("Iteration to reach threshold (NC = Not Converged)")
     ax.set_ylabel("Count")
     ax.set_title(f"Convergence Iteration Distribution (threshold={threshold:.0%})")
     ax.legend()
-    ax.set_xlim(0, max_iter + 1)
+    ax.set_xlim(-0.5, n_bins + 1)
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"[SAVE] Convergence histogram: {out_path}")
+
+
+def plot_single_model_histogram(
+    iters: np.ndarray, model: str, out_path: str, threshold: float
+) -> None:
+    """Plot histogram of convergence iterations for a single model.
+
+    Args:
+        iters: Array of convergence iterations (may include NOT_CONVERGED=-1)
+        model: Model name for title
+        out_path: Output file path
+        threshold: Convergence threshold for title
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    converged_iters = iters[iters != NOT_CONVERGED]
+    nc_count = int(np.sum(iters == NOT_CONVERGED))
+    n_total = len(iters)
+    n_converged = len(converged_iters)
+
+    if n_converged > 0:
+        max_iter = int(np.max(converged_iters))
+    else:
+        max_iter = 100
+
+    # Create bins
+    bin_edges = list(range(max_iter + 2))
+    n_bins = len(bin_edges) - 1
+
+    # Plot histogram for converged samples
+    counts, _ = np.histogram(converged_iters, bins=bin_edges)
+    ax.bar(range(n_bins), counts, width=0.8, color="steelblue", alpha=0.8)
+
+    # Plot NC bin
+    ax.bar(n_bins, nc_count, width=0.8, color="salmon", alpha=0.8)
+
+    # Set x-axis labels
+    x_tick_positions = list(range(n_bins)) + [n_bins]
+    x_tick_labels = [str(i) for i in range(n_bins)] + ["NC"]
+    ax.set_xticks(x_tick_positions)
+    ax.set_xticklabels(x_tick_labels, fontsize=8)
+
+    ax.set_xlabel("Iteration to reach threshold (NC = Not Converged)")
+    ax.set_ylabel("Count")
+    convergence_rate = n_converged / n_total * 100 if n_total > 0 else 0
+    ax.set_title(
+        f"{model}: Convergence Distribution (threshold={threshold:.0%}, "
+        f"converged={convergence_rate:.1f}%)"
+    )
+    ax.set_xlim(-0.5, n_bins + 1.5)
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] Single model histogram: {out_path}")
 
 
 def plot_convergence_cdf(
@@ -518,9 +781,23 @@ def plot_convergence_cdf(
     print(f"[SAVE] Convergence CDF: {out_path}")
 
 
-def plot_mean_loss_curves_overlay(data_list: List[LossData], out_path: str) -> None:
-    """Plot mean normalized loss curves for all models overlaid."""
-    models = sorted(set(d.model for d in data_list))
+def plot_mean_loss_curves_overlay(
+    data_list: List[LossData], out_path: str, threshold: float
+) -> None:
+    """Plot mean normalized loss curves for all models overlaid.
+
+    Args:
+        data_list: List of LossData objects
+        out_path: Output file path
+        threshold: Convergence threshold for horizontal line
+    """
+    # Use fixed model ordering
+    available_models = set(d.model for d in data_list)
+    models = [m for m in MODEL_ORDER if m in available_models]
+
+    if not models:
+        print("[WARN] No data for mean loss overlay")
+        return
 
     fig, ax = plt.subplots(figsize=(10, 6))
     colors = plt.cm.tab10(np.linspace(0, 1, len(models)))
@@ -554,8 +831,22 @@ def plot_mean_loss_curves_overlay(data_list: List[LossData], out_path: str) -> N
     ax.set_title("Mean Normalized Loss Curves by Model")
     ax.legend()
     ax.axhline(y=1.0, color="gray", linestyle="--", alpha=0.5)
-    ax.axhline(y=0.99, color="red", linestyle=":", alpha=0.7)
+    ax.axhline(
+        y=threshold,
+        color="red",
+        linestyle=":",
+        alpha=0.7,
+        label=f"threshold={threshold:.0%}",
+    )
     ax.set_ylim(-0.1, 1.2)
+
+    # Add threshold to y-axis ticks
+    yticks = list(ax.get_yticks())
+    if threshold not in yticks:
+        yticks.append(threshold)
+        yticks = sorted([y for y in yticks if -0.1 <= y <= 1.2])
+        ax.set_yticks(yticks)
+
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
@@ -584,7 +875,7 @@ def main() -> None:
         "--threshold",
         type=float,
         default=0.99,
-        help="Convergence threshold as fraction of final loss (default: 0.99)",
+        help="Convergence threshold as fraction of normalized progress (default: 0.99)",
     )
     args = parser.parse_args()
 
@@ -599,30 +890,110 @@ def main() -> None:
         print("[ERROR] No loss files found")
         return
 
+    # Get available datasets and inits
+    datasets = sorted(set(d.dataset for d in data_list))
+    inits = sorted(set(d.init for d in data_list))
+
+    # Create subdirectories for each dataset/init combination
+    for dataset in datasets:
+        for init in inits:
+            subdir = os.path.join(result_dir, dataset, init)
+            os.makedirs(subdir, exist_ok=True)
+
     # Compute convergence stats
     stats = aggregate_convergence_stats(data_list, args.threshold)
 
     # Print summary to console
     print_convergence_summary(stats, args.threshold)
 
-    # Save markdown summary
+    # Save markdown summary to top-level directory
     save_markdown_summary(
-        stats, args.threshold, os.path.join(result_dir, "convergence_summary.md")
+        stats, args.threshold, os.path.join(result_dir, "convergence_report.md")
     )
 
-    # Generate plots
+    # Generate plots for each dataset/init combination
+    for dataset in datasets:
+        for init in inits:
+            subdir = os.path.join(result_dir, dataset, init)
+
+            # Filter data for this dataset/init
+            subset_data = [
+                d for d in data_list if d.dataset == dataset and d.init == init
+            ]
+            if not subset_data:
+                continue
+
+            # Compute stats for this subset
+            subset_stats = aggregate_convergence_stats(subset_data, args.threshold)
+
+            # Plot normalized loss curves
+            plot_normalized_loss_curves(
+                subset_data,
+                os.path.join(subdir, "normalized_loss_curves.png"),
+                args.threshold,
+            )
+
+            # Plot combined histogram
+            plot_convergence_histogram(
+                subset_stats,
+                os.path.join(subdir, "convergence_histogram.png"),
+                args.threshold,
+            )
+
+            # Plot individual model histograms
+            for model in MODEL_ORDER:
+                if model not in subset_stats:
+                    continue
+                model_iters = []
+                for init_key in subset_stats[model]:
+                    model_iters.extend(subset_stats[model][init_key].tolist())
+                if model_iters:
+                    plot_single_model_histogram(
+                        np.array(model_iters),
+                        model,
+                        os.path.join(subdir, f"convergence_histogram_{model}.png"),
+                        args.threshold,
+                    )
+
+            # Plot mean loss overlay
+            plot_mean_loss_curves_overlay(
+                subset_data,
+                os.path.join(subdir, "mean_loss_overlay.png"),
+                args.threshold,
+            )
+
+    # Also generate plots at the top level for all data combined
     plot_normalized_loss_curves(
-        data_list, os.path.join(result_dir, "normalized_loss_curves.png")
+        data_list,
+        os.path.join(result_dir, "normalized_loss_curves.png"),
+        args.threshold,
     )
     plot_convergence_histogram(
-        stats, os.path.join(result_dir, "convergence_histogram.png"), args.threshold
+        stats,
+        os.path.join(result_dir, "convergence_histogram.png"),
+        args.threshold,
     )
     plot_convergence_cdf(
         stats, os.path.join(result_dir, "convergence_cdf.png"), args.threshold
     )
     plot_mean_loss_curves_overlay(
-        data_list, os.path.join(result_dir, "mean_loss_overlay.png")
+        data_list, os.path.join(result_dir, "mean_loss_overlay.png"), args.threshold
     )
+
+    # Generate individual model histograms at top level
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
+        model_iters = []
+        for init_key in stats[model]:
+            model_iters.extend(stats[model][init_key].tolist())
+        if model_iters:
+            plot_single_model_histogram(
+                np.array(model_iters),
+                model,
+                os.path.join(result_dir, f"convergence_histogram_{model}.png"),
+                args.threshold,
+            )
 
     print(f"\n[DONE] Results saved to {result_dir}")
 
