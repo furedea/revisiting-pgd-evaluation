@@ -983,36 +983,10 @@ def main() -> None:
                 args.threshold,
             )
 
-    # Also generate plots at the top level for all data combined
-    plot_normalized_loss_curves(
-        data_list,
-        os.path.join(result_dir, "normalized_loss_curves.png"),
-        args.threshold,
-    )
-    plot_convergence_histogram(
-        stats,
-        os.path.join(result_dir, "convergence_histogram.png"),
-        args.threshold,
-    )
-    plot_convergence_cdf(
-        stats, os.path.join(result_dir, "convergence_cdf.png"), args.threshold
-    )
-    plot_mean_loss_curves_overlay(
-        data_list, os.path.join(result_dir, "mean_loss_overlay.png"), args.threshold
-    )
-
-    # Generate individual model histograms at top level
-    for model in MODEL_ORDER:
-        if model not in stats:
-            continue
-        model_iters = []
-        for init_key in stats[model]:
-            model_iters.extend(stats[model][init_key].tolist())
-        if model_iters:
-            plot_single_model_histogram(
-                np.array(model_iters),
-                model,
-                os.path.join(result_dir, f"convergence_histogram_{model}.png"),
+            # Plot convergence CDF
+            plot_convergence_cdf(
+                subset_stats,
+                os.path.join(subdir, "convergence_cdf.png"),
                 args.threshold,
             )
 
