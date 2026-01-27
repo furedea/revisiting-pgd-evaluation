@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 matplotlib.use("Agg")
@@ -668,6 +669,7 @@ def plot_convergence_histogram(
     ax.set_title(f"Convergence Iteration Distribution (threshold={threshold:.0%})")
     ax.legend()
     ax.set_xlim(-0.5, n_bins + 1)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -724,6 +726,7 @@ def plot_single_model_histogram(
         f"converged={convergence_rate:.1f}%)"
     )
     ax.set_xlim(-0.5, n_bins + 1.5)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -793,7 +796,6 @@ def plot_convergence_cdf(
     ax.set_title(f"Convergence CDF (threshold={threshold:.0%} of final loss)")
     ax.legend(loc="lower right")
     ax.set_ylim(0, 1.05)
-    ax.axhline(y=0.95, color="red", linestyle=":", alpha=0.7, label="95%")
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
