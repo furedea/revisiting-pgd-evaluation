@@ -341,11 +341,11 @@ def generate_markdown_summary(
     lines.append("")
     lines.append(f"**Threshold**: {threshold:.0%} of max loss")
     lines.append("")
-    lines.append("**Restarts per init**:")
-    lines.append("- clean: 1 (deterministic)")
+    lines.append("**Data points per init** (single sample):")
+    lines.append("- clean: 1 (deterministic, single point)")
     lines.append("- random: 20 (stochastic)")
-    lines.append("- deepfool: 1 (deterministic)")
-    lines.append("- multi_deepfool: 9 (deterministic)")
+    lines.append("- deepfool: 1 (deterministic, single point)")
+    lines.append("- multi_deepfool: 9 (deterministic, 9 target classes)")
     lines.append("")
     lines.append("**NC Types**:")
     lines.append("- Never Reached (NR): Never reached threshold")
@@ -545,7 +545,7 @@ def plot_normalized_loss_curves(
         len(models), len(inits), figsize=(5 * len(inits), 4 * len(models)), squeeze=False
     )
     fig.suptitle(
-        f"Normalized Loss Curves ({dataset.upper()}, init={init})",
+        f"Normalized Loss Curves ({dataset.upper()}, init={init}, single sample)",
         fontsize=14, y=1.02
     )
 
@@ -679,7 +679,7 @@ def plot_convergence_histogram(
             width=bar_width,
             color=colors[idx],
             alpha=0.8,
-            label=f"{model} (n={len(iters)})",
+            label=f"{model} (n={len(converged_iters)}/{len(iters)})",
         )
 
         # Plot NR (Never Reached) bin
@@ -704,7 +704,7 @@ def plot_convergence_histogram(
     ax.set_ylabel("Count")
     ax.set_title(
         f"Convergence Iteration Distribution "
-        f"({dataset.upper()}, init={init}, threshold={threshold:.0%})"
+        f"({dataset.upper()}, init={init}, threshold={threshold:.0%}, single sample)"
     )
     ax.legend()
     ax.set_xlim(-0.5, n_bins + 2.5)
@@ -777,7 +777,7 @@ def plot_single_model_histogram(
     ax.set_title(
         f"Convergence Distribution "
         f"({dataset.upper()}, init={init}, model={model}, "
-        f"threshold={threshold:.0%}, converged={convergence_rate:.1f}%)"
+        f"threshold={threshold:.0%}, n={n_total}, converged={convergence_rate:.1f}%)"
     )
     ax.set_xlim(-0.5, n_bins + 2.5)
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -830,8 +830,8 @@ def plot_convergence_cdf(
         # CDF: fraction of total samples converged by iteration N
         cdf = np.arange(1, len(sorted_iters) + 1) / n_total
         conv_rate = len(converged) / n_total * 100
-        # Legend shows: model (conv%, NR:n, US:n)
-        label = f"{model} ({conv_rate:.0f}%, NR:{n_never}, US:{n_unstable})"
+        # Legend shows: model (n=total, conv%, NR:n, US:n)
+        label = f"{model} (n={n_total}, {conv_rate:.0f}%, NR:{n_never}, US:{n_unstable})"
         ax.step(
             sorted_iters,
             cdf,
@@ -852,7 +852,7 @@ def plot_convergence_cdf(
         all_sorted = np.sort(all_converged)
         cdf_combined = np.arange(1, len(all_sorted) + 1) / n_total_all
         conv_rate_all = len(all_converged) / n_total_all * 100
-        label_all = f"ALL ({conv_rate_all:.0f}%, NR:{n_never_all}, US:{n_unstable_all})"
+        label_all = f"ALL (n={n_total_all}, {conv_rate_all:.0f}%, NR:{n_never_all}, US:{n_unstable_all})"
         ax.step(
             all_sorted,
             cdf_combined,
@@ -866,7 +866,7 @@ def plot_convergence_cdf(
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fraction converged")
     ax.set_title(
-        f"Convergence CDF ({dataset.upper()}, init={init}, threshold={threshold:.0%})"
+        f"Convergence CDF ({dataset.upper()}, init={init}, threshold={threshold:.0%}, single sample)"
     )
     ax.legend(loc="lower right", fontsize=8)
     ax.set_ylim(0, 1.05)
@@ -931,7 +931,7 @@ def plot_mean_loss_curves_overlay(
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Normalized Loss (0=initial, 1=max)")
-    ax.set_title(f"Mean Normalized Loss Curves ({dataset.upper()}, init={init})")
+    ax.set_title(f"Mean Normalized Loss Curves ({dataset.upper()}, init={init}, single sample)")
     ax.legend()
     ax.axhline(y=1.0, color="gray", linestyle="--", alpha=0.5)
     ax.axhline(
