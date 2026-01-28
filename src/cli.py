@@ -25,7 +25,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--total_iter", type=int, default=100)
     ap.add_argument("--num_restarts", type=int, default=20)
 
-    ap.add_argument("--init", choices=["random", "deepfool"], default="random")
+    ap.add_argument("--init", choices=["random", "deepfool", "clean"], default="random")
     ap.add_argument("--df_max_iter", type=int, default=50)
     ap.add_argument("--df_overshoot", type=float, default=0.02)
     ap.add_argument("--df_jitter", type=float, default=0.0)

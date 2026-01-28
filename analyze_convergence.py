@@ -22,7 +22,7 @@ matplotlib.use("Agg")
 
 # Fixed ordering for consistent plots
 MODEL_ORDER = ["nat", "nat_and_adv", "weak_adv", "adv"]  # top to bottom
-INIT_ORDER = ["random", "deepfool", "multi_deepfool"]  # left to right
+INIT_ORDER = ["clean", "random", "deepfool", "multi_deepfool"]  # left to right
 
 # Markers for unconverged samples
 NC_NEVER_REACHED = -1  # Never reached threshold
@@ -92,7 +92,7 @@ def parse_filename(filepath: str) -> Optional[Tuple[str, str, str, int]]:
     # Models: nat, adv, nat_and_adv, weak_adv
     # Inits: random, deepfool, multi_deepfool
     model_patterns = ["nat_and_adv", "weak_adv", "nat", "adv"]
-    init_patterns = ["multi_deepfool", "deepfool", "random"]
+    init_patterns = ["multi_deepfool", "deepfool", "random", "clean"]
 
     model = None
     init = None
@@ -325,20 +325,27 @@ def print_convergence_summary(
 
 
 def generate_markdown_summary(
-    stats: Dict[str, Dict[str, np.ndarray]], threshold: float
+    stats: Dict[str, Dict[str, np.ndarray]], threshold: float, dataset: str
 ) -> str:
     """Generate markdown formatted summary.
 
     Returns markdown string with:
-    - Convergence statistics table
     - Detailed table (model × init breakdown)
     - Summary table (model-level aggregation)
     - Overall summary
     """
     lines = []
-    lines.append("# Convergence Analysis Summary")
+    lines.append(f"# Convergence Analysis Summary ({dataset.upper()})")
+    lines.append("")
+    lines.append(f"**Dataset**: {dataset.upper()}")
     lines.append("")
     lines.append(f"**Threshold**: {threshold:.0%} of max loss")
+    lines.append("")
+    lines.append("**Restarts per init**:")
+    lines.append("- clean: 1 (deterministic)")
+    lines.append("- random: 20 (stochastic)")
+    lines.append("- deepfool: 1 (deterministic)")
+    lines.append("- multi_deepfool: 9 (deterministic)")
     lines.append("")
     lines.append("**NC Types**:")
     lines.append("- Never Reached (NR): Never reached threshold")
@@ -349,10 +356,10 @@ def generate_markdown_summary(
     lines.append("## Detailed Results (by model and init)")
     lines.append("")
     lines.append(
-        "| Model | Init | Conv Rate | Mean | Median | P95 | Max | N | NR | US |"
+        "| Model | Init | Conv | Mean | Median | P95 | Max | N | NR | US |"
     )
     lines.append(
-        "|-------|------|----------:|-----:|-------:|----:|----:|--:|---:|---:|"
+        "|-------|------|-----:|-----:|-------:|----:|----:|--:|---:|---:|"
     )
 
     all_iters = []
@@ -371,27 +378,29 @@ def generate_markdown_summary(
             n_never = int(np.sum(iters == NC_NEVER_REACHED))
             n_unstable = int(np.sum(iters == NC_UNSTABLE))
             conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+            nr_rate = n_never / n_total * 100 if n_total > 0 else 0
+            us_rate = n_unstable / n_total * 100 if n_total > 0 else 0
 
             if n_converged > 0:
                 lines.append(
                     f"| {model} | {init} | "
-                    f"{conv_rate:.1f}% | "
+                    f"{conv_rate:.0f}%({n_converged}/{n_total}) | "
                     f"{np.mean(converged):.1f} | "
                     f"{np.median(converged):.1f} | "
                     f"{np.percentile(converged, 95):.1f} | "
                     f"{np.max(converged):.0f} | "
                     f"{n_total} | "
-                    f"{n_never} | "
-                    f"{n_unstable} |"
+                    f"{nr_rate:.0f}%({n_never}) | "
+                    f"{us_rate:.0f}%({n_unstable}) |"
                 )
             else:
                 lines.append(
                     f"| {model} | {init} | "
-                    f"{conv_rate:.1f}% | "
+                    f"{conv_rate:.0f}%({n_converged}/{n_total}) | "
                     f"N/A | N/A | N/A | N/A | "
                     f"{n_total} | "
-                    f"{n_never} | "
-                    f"{n_unstable} |"
+                    f"{nr_rate:.0f}%({n_never}) | "
+                    f"{us_rate:.0f}%({n_unstable}) |"
                 )
 
     lines.append("")
@@ -399,8 +408,8 @@ def generate_markdown_summary(
     # Model-level summary table
     lines.append("## Model-level Summary")
     lines.append("")
-    lines.append("| Model | Conv Rate | Mean | Median | P95 | Max | N | NR | US |")
-    lines.append("|-------|----------:|-----:|-------:|----:|----:|--:|---:|---:|")
+    lines.append("| Model | Conv | Mean | Median | P95 | Max | N | NR | US |")
+    lines.append("|-------|-----:|-----:|-------:|----:|----:|--:|---:|---:|")
 
     for model in MODEL_ORDER:
         if model not in stats:
@@ -416,27 +425,29 @@ def generate_markdown_summary(
         n_never = int(np.sum(model_iters == NC_NEVER_REACHED))
         n_unstable = int(np.sum(model_iters == NC_UNSTABLE))
         conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+        nr_rate = n_never / n_total * 100 if n_total > 0 else 0
+        us_rate = n_unstable / n_total * 100 if n_total > 0 else 0
 
         if n_converged > 0:
             lines.append(
                 f"| {model} | "
-                f"{conv_rate:.1f}% | "
+                f"{conv_rate:.0f}%({n_converged}/{n_total}) | "
                 f"{np.mean(converged):.1f} | "
                 f"{np.median(converged):.1f} | "
                 f"{np.percentile(converged, 95):.1f} | "
                 f"{np.max(converged):.0f} | "
                 f"{n_total} | "
-                f"{n_never} | "
-                f"{n_unstable} |"
+                f"{nr_rate:.0f}%({n_never}) | "
+                f"{us_rate:.0f}%({n_unstable}) |"
             )
         else:
             lines.append(
                 f"| {model} | "
-                f"{conv_rate:.1f}% | "
+                f"{conv_rate:.0f}%({n_converged}/{n_total}) | "
                 f"N/A | N/A | N/A | N/A | "
                 f"{n_total} | "
-                f"{n_never} | "
-                f"{n_unstable} |"
+                f"{nr_rate:.0f}%({n_never}) | "
+                f"{us_rate:.0f}%({n_unstable}) |"
             )
 
     lines.append("")
@@ -450,16 +461,18 @@ def generate_markdown_summary(
         n_never = int(np.sum(all_iters == NC_NEVER_REACHED))
         n_unstable = int(np.sum(all_iters == NC_UNSTABLE))
         conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
+        nr_rate = n_never / n_total * 100 if n_total > 0 else 0
+        us_rate = n_unstable / n_total * 100 if n_total > 0 else 0
 
         lines.append("## Overall Summary (All Models Combined)")
         lines.append("")
         lines.append("| Metric | Value |")
         lines.append("|--------|------:|")
-        lines.append(f"| Convergence Rate | {conv_rate:.1f}% |")
+        lines.append(f"| Convergence Rate | {conv_rate:.0f}%({n_converged}/{n_total}) |")
         lines.append(f"| Total samples | {n_total} |")
         lines.append(f"| Converged | {n_converged} |")
-        lines.append(f"| NC (Never Reached) | {n_never} |")
-        lines.append(f"| NC (Unstable) | {n_unstable} |")
+        lines.append(f"| NC (Never Reached) | {nr_rate:.0f}%({n_never}) |")
+        lines.append(f"| NC (Unstable) | {us_rate:.0f}%({n_unstable}) |")
 
         if n_converged > 0:
             lines.append(f"| Mean (converged) | {np.mean(converged):.1f} |")
@@ -488,10 +501,13 @@ def generate_markdown_summary(
 
 
 def save_markdown_summary(
-    stats: Dict[str, Dict[str, np.ndarray]], threshold: float, out_path: str
+    stats: Dict[str, Dict[str, np.ndarray]],
+    threshold: float,
+    out_path: str,
+    dataset: str,
 ) -> None:
     """Save markdown summary to file."""
-    md_content = generate_markdown_summary(stats, threshold)
+    md_content = generate_markdown_summary(stats, threshold, dataset)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(md_content)
     print(f"[SAVE] Markdown summary: {out_path}")
@@ -1018,6 +1034,7 @@ def main() -> None:
             dataset_stats,
             args.threshold,
             os.path.join(dataset_dir, "convergence_report.md"),
+            dataset,
         )
 
     # Generate plots for each dataset/init combination

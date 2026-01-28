@@ -27,6 +27,9 @@ def build_initial_points(
     eps: float,
 ) -> np.ndarray:
     """Build initial adversarial points for PGD."""
+    if init == "clean":
+        return x_nat_batch.astype(np.float32).copy()
+
     if init == "deepfool":
         if x_init is None:
             raise ValueError("init='deepfool' requires x_init.")
@@ -35,6 +38,7 @@ def build_initial_points(
         x_adv = project_linf(x_adv, x_nat_batch, float(eps))
         return clip_to_unit_interval(x_adv)
 
+    # random init
     noise = rng.uniform(low=-eps, high=eps, size=x_nat_batch.shape).astype(np.float32)
     x_adv = project_linf(x_nat_batch + noise, x_nat_batch, float(eps))
     return clip_to_unit_interval(x_adv)

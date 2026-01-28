@@ -33,10 +33,15 @@ CIFAR10_ALPHA=0.00784313725490196 # 2/255
 
 # Common parameters
 N_EXAMPLES=5
-NUM_RESTARTS=9
 TOTAL_ITER=100
 DF_MAX_ITER=50
 DF_OVERSHOOT=0.02
+
+# Restarts per init type
+NUM_RESTARTS_CLEAN=1
+NUM_RESTARTS_RANDOM=20
+NUM_RESTARTS_DEEPFOOL=1
+NUM_RESTARTS_MULTI_DEEPFOOL=9
 
 # Experiment name
 EXP_NAME=run_all
@@ -52,7 +57,7 @@ run "src/main.py" "src_mnist_nat_random" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
 
 run "src/main.py" "src_mnist_adv_random" \
@@ -63,7 +68,7 @@ run "src/main.py" "src_mnist_adv_random" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
 
 run "src/main.py" "src_mnist_nat_and_adv_random" \
@@ -74,7 +79,7 @@ run "src/main.py" "src_mnist_nat_and_adv_random" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
 
 run "src/main.py" "src_mnist_weak_adv_random" \
@@ -85,7 +90,7 @@ run "src/main.py" "src_mnist_weak_adv_random" \
   --dataset mnist \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
 
 run "src/main.py" "src_cifar10_nat_random" \
@@ -96,7 +101,7 @@ run "src/main.py" "src_cifar10_nat_random" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
 
 run "src/main.py" "src_cifar10_adv_random" \
@@ -107,7 +112,7 @@ run "src/main.py" "src_cifar10_adv_random" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
 
 run "src/main.py" "src_cifar10_nat_and_adv_random" \
@@ -118,7 +123,7 @@ run "src/main.py" "src_cifar10_nat_and_adv_random" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
 
 run "src/main.py" "src_cifar10_weak_adv_random" \
@@ -129,7 +134,7 @@ run "src/main.py" "src_cifar10_weak_adv_random" \
   --dataset cifar10 \
   --init random --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" \
+  --num_restarts "$NUM_RESTARTS_RANDOM" --total_iter "$TOTAL_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
 
 # ==================================================================
@@ -143,7 +148,7 @@ run "src/main.py" "src_mnist_nat_deepfool" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -155,7 +160,7 @@ run "src/main.py" "src_mnist_adv_deepfool" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -167,7 +172,7 @@ run "src/main.py" "src_mnist_nat_and_adv_deepfool" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -179,7 +184,7 @@ run "src/main.py" "src_mnist_weak_adv_deepfool" \
   --dataset mnist \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -191,7 +196,7 @@ run "src/main.py" "src_cifar10_nat_deepfool" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -203,7 +208,7 @@ run "src/main.py" "src_cifar10_adv_deepfool" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -215,7 +220,7 @@ run "src/main.py" "src_cifar10_nat_and_adv_deepfool" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -227,7 +232,7 @@ run "src/main.py" "src_cifar10_weak_adv_deepfool" \
   --dataset cifar10 \
   --init deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -242,7 +247,7 @@ run "loss_curves.py" "lc_mnist_nat_multi_deepfool" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -254,7 +259,7 @@ run "loss_curves.py" "lc_mnist_adv_multi_deepfool" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -266,7 +271,7 @@ run "loss_curves.py" "lc_mnist_nat_and_adv_multi_deepfool" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -278,7 +283,7 @@ run "loss_curves.py" "lc_mnist_weak_adv_multi_deepfool" \
   --dataset mnist \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -290,7 +295,7 @@ run "loss_curves.py" "lc_cifar10_nat_multi_deepfool" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -302,7 +307,7 @@ run "loss_curves.py" "lc_cifar10_adv_multi_deepfool" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -314,7 +319,7 @@ run "loss_curves.py" "lc_cifar10_nat_and_adv_multi_deepfool" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
 
@@ -326,8 +331,99 @@ run "loss_curves.py" "lc_cifar10_weak_adv_multi_deepfool" \
   --dataset cifar10 \
   --init multi_deepfool --seed 0 \
   --n_examples "$N_EXAMPLES" \
-  --num_restarts "$NUM_RESTARTS" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
+  --num_restarts "$NUM_RESTARTS_MULTI_DEEPFOOL" --total_iter "$TOTAL_ITER" --df_max_iter "$DF_MAX_ITER" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --df_overshoot "$DF_OVERSHOOT" --init_sanity_plot
+
+# ==================================================================
+# src/main.py: clean init
+# ==================================================================
+run "src/main.py" "src_mnist_nat_clean" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/nat \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset mnist \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
+
+run "src/main.py" "src_mnist_adv_clean" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset mnist \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
+
+run "src/main.py" "src_mnist_nat_and_adv_clean" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/nat_and_adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset mnist \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
+
+run "src/main.py" "src_mnist_weak_adv_clean" \
+  --model_src_dir model_src/mnist_challenge \
+  --ckpt_dir model_src/mnist_challenge/models/weak_adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset mnist \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$MNIST_EPS" --alpha "$MNIST_ALPHA"
+
+run "src/main.py" "src_cifar10_nat_clean" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/nat \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset cifar10 \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
+
+run "src/main.py" "src_cifar10_adv_clean" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset cifar10 \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
+
+run "src/main.py" "src_cifar10_nat_and_adv_clean" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/nat_and_adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset cifar10 \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
+
+run "src/main.py" "src_cifar10_weak_adv_clean" \
+  --model_src_dir model_src/cifar10_challenge \
+  --ckpt_dir model_src/cifar10_challenge/models/weak_adv \
+  --out_dir "$OUT_DIR" \
+  --exp_name "$EXP_NAME" \
+  --dataset cifar10 \
+  --init clean --seed 0 \
+  --n_examples "$N_EXAMPLES" \
+  --num_restarts "$NUM_RESTARTS_CLEAN" --total_iter "$TOTAL_ITER" \
+  --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA"
 
 echo "ALL DONE."
