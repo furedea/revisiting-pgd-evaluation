@@ -97,3 +97,6 @@ build/
 out/
 dist/
 
+*.npy
+*.png
+docs/卒論/figure/

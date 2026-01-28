@@ -23,29 +23,15 @@ DeepFool初期化により，以下の効果が期待される：
 まず，入力画像$x$に対してDeepFoolを適用し，敵対的サンプル$x_{\text{df}}$を生成する．DeepFoolの更新式は式(\ref{eq:deepfool})で示した通りであり，パラメータとして最大反復回数$T_{\text{df}}$とオーバーシュート係数$\eta$を設定する．本研究では$T_{\text{df}} = 50$，$\eta = 0.02$を用いる．
 
 \subsection{$\ell_\infty$制約への射影}
+\label{sec:projection}
 DeepFoolは$\ell_2$ノルム最小の摂動を求める手法であるため，得られた敵対的サンプル$x_{\text{df}}$はPGD攻撃の$\ell_\infty$制約を満たさない場合がある．そのため，$x_{\text{df}}$を$\ell_\infty$制約範囲に射影してPGDの初期点$x_{\text{init}}$を得る必要がある．
 
-この射影方法として，以下の2つの方法を検討する．
-
-\subsubsection{成分毎クリッピング}
-DeepFoolによる敵対的サンプルの各成分を個別に$\ell_\infty$制約範囲にクリッピングする：
+本研究では，成分毎クリッピングによる射影を用いる．DeepFoolによる敵対的サンプルの各成分を個別に$\ell_\infty$制約範囲にクリッピングする：
 \begin{align}
     \{x_{\text{init}}\}_i = \text{clip}(\{x_{\text{df}}\}_i, \{x\}_i - \varepsilon, \{x\}_i + \varepsilon)
     \label{eq:clip}
 \end{align}
-ここで$\{\cdot\}_i$は$i$番目の成分を表す．この方法では，各成分が独立に制約範囲に収められるため，摂動の方向（各成分の比率）が元のDeepFool摂動から変化する可能性がある．
-
-\subsubsection{スケーリング}
-摂動の方向を保持したまま，$\ell_\infty$ノルムが$\varepsilon$以下となるようにスケーリングする：
-\begin{align}
-    x_{\text{init}} = x + s \cdot \delta_{\text{df}}
-    \label{eq:scale}
-\end{align}
-ここで$\delta_{\text{df}} = x_{\text{df}} - x$はDeepFoolによる摂動であり，スケーリング係数$s$は以下のように定める：
-\begin{align}
-    s = \min\left(1, \frac{\varepsilon}{\|\delta_{\text{df}}\|_\infty}\right)
-\end{align}
-この方法では摂動の方向は保存されるが，$\|\delta_{\text{df}}\|_\infty > \varepsilon$の場合は摂動が縮小されるため，ラベル境界から入力点寄りに戻される可能性がある．
+ここで$\{\cdot\}_i$は$i$番目の成分を表す．この方法では，各成分が独立に制約範囲に収められる．
 
 \subsection{PGD攻撃の実行}
 射影後の初期点$x_{\text{init}}$から通常のPGD攻撃を開始する．更新式は式(\ref{eq:pgd})と同様であり，$x^0_{\text{adv}} = x_{\text{init}}$として反復を行う．
@@ -81,7 +67,7 @@ DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg:deepf
 \REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復回数$T_{\text{pgd}}$，DeepFoolパラメータ$(T_{\text{df}}, \eta)$
 \ENSURE 敵対的サンプル$x_{\text{adv}}$
 \STATE DeepFoolを適用して$x_{\text{df}}$を取得
-\STATE $x_{\text{init}} \leftarrow$ $x_{\text{df}}$を$\ell_\infty$制約範囲に射影（式(\ref{eq:clip})または式(\ref{eq:scale})）
+\STATE $x_{\text{init}} \leftarrow$ $x_{\text{df}}$を$\ell_\infty$制約範囲にクリッピング（式(\ref{eq:clip})）
 \STATE $x^0_{\text{adv}} \leftarrow x_{\text{init}}$
 \FOR{$t = 0$ to $T_{\text{pgd}} - 1$}
     \STATE $x^{t+1}_{\text{adv}} \leftarrow \Pi_{x + \mathcal{S}} \left( x^t_{\text{adv}} + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t_{\text{adv}}, y) \right) \right)$
@@ -90,22 +76,19 @@ DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg:deepf
 \end{algorithmic}
 \end{algorithm}
 
-\section{考慮事項}
-\label{sec:considerations}
+\section{計算コストに関する考察}
+\label{sec:computational_cost}
 
-\subsection{計算コスト}
-DeepFool初期化では，PGD攻撃の前にDeepFoolを実行する必要があるため，追加の計算コストが発生する．DeepFoolの計算量は主に勾配計算に由来し，反復回数$T_{\text{df}}$に比例する．ただし，DeepFool初期化によりPGD攻撃の収束が早まれば，必要なPGDの反復回数を削減できる可能性があり，総計算量は減少し得る．
+DeepFool初期化では，PGD攻撃の前にDeepFoolを実行する必要があるため，追加の計算コストが発生する．
 
-\subsection{ランダム性の導入}
-DeepFoolは決定論的なアルゴリズムであり，同じ入力に対して常に同じ敵対的サンプルを生成する．複数のランダム初期化PGDを実行して最良の結果を選択するアプローチとは異なり，DeepFool初期化では初期点が一意に定まる．
+\subsection{DeepFoolの計算コスト}
+DeepFoolの計算量は主に勾配計算に由来する．各反復において，全てのラベル$k \neq y$について勾配$\nabla g_k(x)$を計算する必要がある．$K$クラス分類問題においては，1反復あたり$K-1$回の勾配計算が必要となる．DeepFoolの最大反復回数を$T_{\text{df}}$とすると，DeepFool単体での勾配計算回数は最大$(K-1) \cdot T_{\text{df}}$回となる．
 
-ランダム性を導入するため，DeepFoolの敵対的サンプルに微小なランダムノイズ（ジッター）を加えることを検討する：
-\begin{align}
-    x'_{\text{df}} = x_{\text{df}} + j, \quad j \sim \text{Uniform}(-\text{jitter}, \text{jitter})^D
-\end{align}
-ここでjitterはノイズの大きさを制御するパラメータである．
+MNISTおよびCIFAR10では$K = 10$であるため，$T_{\text{df}} = 50$の設定では最大450回の勾配計算が必要となる．
 
-\subsection{損失関数との関係}
-本研究ではクロスエントロピー損失を用いるが，DeepFoolはロジットの差$g_k(x)$に基づいてラベル境界を近似している．ラベル境界上（$g_k = 0$）ではクロスエントロピー損失は$\ln 2 \approx 0.693$程度であり，必ずしも損失が大きい点とは限らない．
+\subsection{Multi-DeepFoolの計算コスト}
+Multi-DeepFool初期化では，$K-1$個のターゲットラベルそれぞれに対してDeepFoolを実行する．したがって，計算コストは通常のDeepFoolの約$K-1$倍となる．ただし，各ターゲットへのDeepFoolは独立に実行可能であるため，並列化による高速化が可能である．
 
-特に自然学習モデルの場合，PGD攻撃により損失が非常に大きくなる傾向があり，DeepFoolで得られる初期損失が相対的に小さくなる場合がある．一方，敵対的学習モデルでは損失の増加が抑制されているため，DeepFool初期化の効果がより顕著に現れる可能性がある．
+\subsection{総計算コストの考察}
+DeepFool初期化によりPGD攻撃の収束が早まれば，必要なPGDの反復回数を削減できる可能性がある．PGDの反復回数削減による計算コスト削減が，DeepFoolの追加コストを上回る場合，総計算量は減少し得る．この点については第\ref{chapter:experiment}章の実験結果に基づいて考察する．
+

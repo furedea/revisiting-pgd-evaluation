@@ -1,0 +1,464 @@
+\chapter{評価実験}
+\label{chapter:experiment}
+本章では，Madryらの実験の再現及び提案手法であるDeepFool初期化の評価実験について述べる．
+
+\section{実験設定}
+\label{sec:experiment_setting}
+
+\subsection{使用モデル}
+Madryらが公開しているリポジトリ\cite{MadryMNIST, MadryCIFAR10}から入手した事前学習済みモデルを使用する．表\ref{table:models_detail}に各モデルの詳細を示す．
+
+\begin{table}[hbtp]
+  \caption{使用モデルの詳細}
+  \label{table:models_detail}
+  \centering
+  \begin{tabular}{l|l|cc}
+    \hline
+    モデル名 & 訓練方法 & MNIST & CIFAR10 \\
+    \hline
+    nat & 自然学習 & \checkmark & \checkmark \\
+    adv & 敵対的学習 & \checkmark & \checkmark \\
+    nat\_and\_adv & 混合学習 & \checkmark & - \\
+    weak\_adv & 弱敵対的学習 & \checkmark & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{攻撃パラメータ}
+表\ref{table:attack_params}にPGD攻撃のパラメータを示す．これらのパラメータはMadryらの論文\cite{PGD}と同一の設定である．
+
+\begin{table}[hbtp]
+  \caption{PGD攻撃のパラメータ設定}
+  \label{table:attack_params}
+  \centering
+  \begin{tabular}{l|cc}
+    \hline
+    パラメータ & MNIST & CIFAR10 \\
+    \hline
+    摂動制約$\varepsilon$ & $0.3$ & $8/255 \approx 0.031$ \\
+    ステップサイズ$\alpha$ & $0.01$ & $2/255 \approx 0.008$ \\
+    反復数$T$ & $100$ & $100$ \\
+    リスタート数 & $9$ & $9$ \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{初期化手法}
+本実験では，以下の3種類の初期化手法を比較する：
+\begin{itemize}
+    \item \textbf{Random}：$\ell_\infty$制約範囲内での一様乱数による初期化
+    \item \textbf{DeepFool}：DeepFoolによる敵対的サンプルを初期点とする手法
+    \item \textbf{Multi-DeepFool}：複数ターゲットへのDeepFoolの中から最大損失の点を選択する手法
+\end{itemize}
+
+DeepFoolのパラメータは，最大反復回数$T_{\text{df}} = 50$，オーバーシュート係数$\eta = 0.02$とする．
+
+\subsection{実行環境}
+% TODO: 実行環境の詳細を記載
+実験はPython 3.xおよびPyTorchを用いて実施した．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ランダム初期化PGDの収束解析}
+\label{sec:random_init_analysis}
+
+本節では，ランダム初期化PGD攻撃の収束挙動を分析する．これはMadryらの実験の再現及び定量的拡張に相当する．
+
+\subsection{MNISTでの結果}
+\label{sec:random_mnist}
+
+図\ref{fig:mnist_random_loss_curves}に，MNISTの各モデルに対するランダム初期化PGD攻撃の損失曲線を示す．各図は1つのサンプルに対する複数リスタートの損失推移を表しており，下部のヒートマップは各リスタートにおける予測の正誤を示す．
+
+% TODO: 図を挿入（figures/run_all/mnist_*_random_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_random_sample.png}
+  \caption{MNIST natモデルに対するランダム初期化PGDの損失曲線（図は実験完了後に挿入）}
+  \label{fig:mnist_nat_random}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_adv_random_sample.png}
+  \caption{MNIST advモデルに対するランダム初期化PGDの損失曲線}
+  \label{fig:mnist_adv_random}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_and_adv_random_sample.png}
+  \caption{MNIST nat\_and\_advモデルに対するランダム初期化PGDの損失曲線}
+  \label{fig:mnist_nat_and_adv_random}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_weak_adv_random_sample.png}
+  \caption{MNIST weak\_advモデルに対するランダム初期化PGDの損失曲線}
+  \label{fig:mnist_weak_adv_random}
+\end{figure}
+
+表\ref{table:mnist_random_convergence}に，MNISTの各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{MNISTランダム初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:mnist_random_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    nat\_and\_adv & - & - & - & - \\
+    weak\_adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{CIFAR10での結果}
+\label{sec:random_cifar10}
+
+図\ref{fig:cifar10_random_loss_curves}に，CIFAR10の各モデルに対するランダム初期化PGD攻撃の損失曲線を示す．
+
+% TODO: 図を挿入（figures/run_all/cifar10_*_random_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_random_sample.png}
+  \caption{CIFAR10 natモデルに対するランダム初期化PGDの損失曲線}
+  \label{fig:cifar10_nat_random}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_adv_random_sample.png}
+  \caption{CIFAR10 advモデルに対するランダム初期化PGDの損失曲線}
+  \label{fig:cifar10_adv_random}
+\end{figure}
+
+表\ref{table:cifar10_random_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{CIFAR10ランダム初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:cifar10_random_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{データセット・モデル間比較}
+\label{sec:random_comparison}
+
+図\ref{fig:random_mean_loss_overlay}に，各モデルの平均正規化損失曲線を示す．この図により，モデル間での収束速度の違いを比較できる．
+
+% TODO: 図を挿入（convergence_analysis/threshold_0_90/*/random/mean_loss_overlay.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_random_mean_loss.png}
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_random_mean_loss.png}
+  \caption{ランダム初期化PGDの平均正規化損失曲線（左：MNIST，右：CIFAR10）}
+  \label{fig:random_mean_loss_overlay}
+\end{figure}
+
+図\ref{fig:random_convergence_cdf}に，収束反復数の累積分布関数（CDF）を示す．
+
+% TODO: 図を挿入（convergence_analysis/threshold_0_90/*/random/convergence_cdf.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_random_cdf.png}
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_random_cdf.png}
+  \caption{ランダム初期化PGDの収束反復数CDF（左：MNIST，右：CIFAR10）}
+  \label{fig:random_convergence_cdf}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{DeepFool初期化の収束解析}
+\label{sec:deepfool_init_analysis}
+
+本節では，DeepFool初期化PGD攻撃の収束挙動を分析し，ランダム初期化との比較を行う．
+
+\subsection{MNISTでの結果}
+\label{sec:deepfool_mnist}
+
+図\ref{fig:mnist_deepfool_loss_curves}に，MNISTの各モデルに対するDeepFool初期化PGD攻撃の損失曲線を示す．
+
+% TODO: 図を挿入（figures/run_all/mnist_*_deepfool_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_deepfool_sample.png}
+  \caption{MNIST natモデルに対するDeepFool初期化PGDの損失曲線}
+  \label{fig:mnist_nat_deepfool}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_adv_deepfool_sample.png}
+  \caption{MNIST advモデルに対するDeepFool初期化PGDの損失曲線}
+  \label{fig:mnist_adv_deepfool}
+\end{figure}
+
+表\ref{table:mnist_deepfool_convergence}に，MNISTの各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{MNIST DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:mnist_deepfool_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    nat\_and\_adv & - & - & - & - \\
+    weak\_adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{CIFAR10での結果}
+\label{sec:deepfool_cifar10}
+
+図\ref{fig:cifar10_deepfool_loss_curves}に，CIFAR10の各モデルに対するDeepFool初期化PGD攻撃の損失曲線を示す．
+
+% TODO: 図を挿入（figures/run_all/cifar10_*_deepfool_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_deepfool_sample.png}
+  \caption{CIFAR10 natモデルに対するDeepFool初期化PGDの損失曲線}
+  \label{fig:cifar10_nat_deepfool}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_adv_deepfool_sample.png}
+  \caption{CIFAR10 advモデルに対するDeepFool初期化PGDの損失曲線}
+  \label{fig:cifar10_adv_deepfool}
+\end{figure}
+
+表\ref{table:cifar10_deepfool_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{CIFAR10 DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:cifar10_deepfool_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{PGD制約$\varepsilon$変化による影響}
+\label{sec:eps_variation}
+
+DeepFoolによる摂動は$\ell_2$ノルムで最小化されるため，PGD攻撃の$\ell_\infty$制約$\varepsilon$との関係が収束に影響を与える可能性がある．本節では，$\varepsilon$を変化させた場合の影響を調査する．
+
+表\ref{table:eps_variation}に，$\varepsilon$を標準設定の1倍，2倍，3倍とした場合の収束統計を示す．
+
+\begin{table}[hbtp]
+  \caption{PGD制約$\varepsilon$変化による収束統計の変化（MNIST nat）}
+  \label{table:eps_variation}
+  \centering
+  \begin{tabular}{l|c|cccc}
+    \hline
+    $\varepsilon$倍率 & $\varepsilon$値 & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    1倍 & 0.3 & - & - & - & - \\
+    2倍 & 0.6 & - & - & - & - \\
+    3倍 & 0.9 & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% TODO: 図を挿入（figures/run_df_eps/mnist_nat_*_eps*.png）
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Multi-DeepFool初期化の収束解析}
+\label{sec:multi_deepfool_analysis}
+
+本節では，Multi-DeepFool初期化PGD攻撃の収束挙動を分析する．
+
+\subsection{MNISTでの結果}
+\label{sec:mdf_mnist}
+
+図\ref{fig:mnist_mdf_loss_curves}に，MNISTの各モデルに対するMulti-DeepFool初期化PGD攻撃の損失曲線を示す．
+
+% TODO: 図を挿入（figures/run_all/mnist_*_multi_deepfool_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_multi_deepfool_sample.png}
+  \caption{MNIST natモデルに対するMulti-DeepFool初期化PGDの損失曲線}
+  \label{fig:mnist_nat_mdf}
+\end{figure}
+
+表\ref{table:mnist_mdf_convergence}に，MNISTの各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{MNIST Multi-DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:mnist_mdf_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    nat\_and\_adv & - & - & - & - \\
+    weak\_adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{CIFAR10での結果}
+\label{sec:mdf_cifar10}
+
+図\ref{fig:cifar10_mdf_loss_curves}に，CIFAR10の各モデルに対するMulti-DeepFool初期化PGD攻撃の損失曲線を示す．
+
+% TODO: 図を挿入（figures/run_all/cifar10_*_multi_deepfool_*.png）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_multi_deepfool_sample.png}
+  \caption{CIFAR10 natモデルに対するMulti-DeepFool初期化PGDの損失曲線}
+  \label{fig:cifar10_nat_mdf}
+\end{figure}
+
+表\ref{table:cifar10_mdf_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+
+\begin{table}[hbtp]
+  \caption{CIFAR10 Multi-DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:cifar10_mdf_convergence}
+  \centering
+  \begin{tabular}{l|cccc}
+    \hline
+    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    nat & - & - & - & - \\
+    adv & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{DeepFool反復回数の影響}
+\label{sec:dfiter_variation}
+
+Multi-DeepFool初期化において，DeepFoolの反復回数$T_{\text{df}}$が収束に与える影響を調査する．
+
+表\ref{table:dfiter_variation}に，$T_{\text{df}}$を変化させた場合の収束統計を示す．
+
+\begin{table}[hbtp]
+  \caption{DeepFool反復回数変化による収束統計の変化（MNIST nat）}
+  \label{table:dfiter_variation}
+  \centering
+  \begin{tabular}{c|cccc}
+    \hline
+    $T_{\text{df}}$ & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    1 & - & - & - & - \\
+    10 & - & - & - & - \\
+    30 & - & - & - & - \\
+    50 & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+% TODO: 図を挿入（figures/run_mdf_iter/mnist_nat_multi_deepfool_*_dfiter*_*.png）
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{初期化手法間の比較}
+\label{sec:init_comparison}
+
+本節では，3種類の初期化手法（Random, DeepFool, Multi-DeepFool）の収束性能を比較する．
+
+図\ref{fig:init_comparison_cdf}に，各初期化手法の収束反復数CDFを示す．
+
+% TODO: 図を挿入（全初期化手法のCDFを重ねたグラフ）
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_init_comparison_cdf.png}
+  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_init_comparison_cdf.png}
+  \caption{初期化手法別の収束反復数CDF比較（左：MNIST，右：CIFAR10）}
+  \label{fig:init_comparison_cdf}
+\end{figure}
+
+表\ref{table:init_comparison_mnist}および表\ref{table:init_comparison_cifar10}に，初期化手法別の収束統計を示す．
+
+\begin{table}[hbtp]
+  \caption{MNIST 初期化手法別比較（閾値$\theta = 0.90$）}
+  \label{table:init_comparison_mnist}
+  \centering
+  \begin{tabular}{l|l|cccc}
+    \hline
+    モデル & 初期化手法 & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    \multirow{3}{*}{nat} & Random & - & - & - & - \\
+    & DeepFool & - & - & - & - \\
+    & Multi-DeepFool & - & - & - & - \\
+    \hline
+    \multirow{3}{*}{adv} & Random & - & - & - & - \\
+    & DeepFool & - & - & - & - \\
+    & Multi-DeepFool & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[hbtp]
+  \caption{CIFAR10 初期化手法別比較（閾値$\theta = 0.90$）}
+  \label{table:init_comparison_cifar10}
+  \centering
+  \begin{tabular}{l|l|cccc}
+    \hline
+    モデル & 初期化手法 & 収束率 & 平均 & 中央値 & P95 \\
+    \hline
+    \multirow{3}{*}{nat} & Random & - & - & - & - \\
+    & DeepFool & - & - & - & - \\
+    & Multi-DeepFool & - & - & - & - \\
+    \hline
+    \multirow{3}{*}{adv} & Random & - & - & - & - \\
+    & DeepFool & - & - & - & - \\
+    & Multi-DeepFool & - & - & - & - \\
+    \hline
+  \end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{総合考察}
+\label{sec:discussion}
+
+本節では，実験結果を総合的に考察する．
+
+\subsection{Madryらの実験の再現性}
+ランダム初期化PGD攻撃の損失曲線は，Madryらの報告と同様に，異なる初期点から開始しても同程度のプラトーに収束する傾向が確認された．
+
+% TODO: 実験結果に基づいて詳細な考察を追記
+
+\subsection{収束速度の定量的評価}
+90\%収束閾値を用いた評価では，以下の傾向が観察された：
+\begin{itemize}
+    \item 自然学習モデル（nat）は敵対的学習モデル（adv）と比較して収束が早い傾向がある
+    \item MNISTとCIFAR10で同様の傾向が確認された
+\end{itemize}
+
+% TODO: 実験結果に基づいて具体的な数値を追記
+
+\subsection{DeepFool初期化の効果}
+DeepFool初期化の効果について，以下の知見が得られた：
+\begin{itemize}
+    \item 自然学習モデルでは，DeepFool初期化により収束が早まる傾向が見られた
+    \item 敵対的学習モデルでは，効果が限定的であった
+\end{itemize}
+
+% TODO: 実験結果に基づいて詳細な考察を追記
+
+\subsection{計算コストの観点からの評価}
+DeepFool初期化による収束の高速化と，DeepFool自体の計算コストのトレードオフについて考察する．
+
+% TODO: 実験結果に基づいて計算コストの考察を追記
+
