@@ -345,43 +345,6 @@ def generate_markdown_summary(
     lines.append("- Unstable (US): Reached threshold but not stable in final window")
     lines.append("")
 
-    # Convergence statistics table
-    lines.append("## Convergence Statistics")
-    lines.append("")
-    lines.append(
-        "| Model | Conv Rate | Mean Iter | NC (NR) | NC (US) | Total NC |"
-    )
-    lines.append(
-        "|-------|----------:|----------:|--------:|--------:|---------:|"
-    )
-
-    for model in MODEL_ORDER:
-        if model not in stats:
-            continue
-        model_iters = []
-        for init in stats[model]:
-            model_iters.extend(stats[model][init].tolist())
-        model_iters = np.array(model_iters)
-
-        n_total = len(model_iters)
-        converged = model_iters[model_iters >= 0]
-        n_converged = len(converged)
-        n_never = int(np.sum(model_iters == NC_NEVER_REACHED))
-        n_unstable = int(np.sum(model_iters == NC_UNSTABLE))
-        conv_rate = n_converged / n_total * 100 if n_total > 0 else 0
-        mean_conv = np.mean(converged) if n_converged > 0 else float("nan")
-
-        lines.append(
-            f"| {model} | "
-            f"{conv_rate:.1f}% | "
-            f"{mean_conv:.1f} | "
-            f"{n_never} | "
-            f"{n_unstable} | "
-            f"{n_never + n_unstable} |"
-        )
-
-    lines.append("")
-
     # Detailed table: model × init
     lines.append("## Detailed Results (by model and init)")
     lines.append("")
@@ -1030,16 +993,32 @@ def main() -> None:
             subdir = os.path.join(result_dir, dataset, init)
             os.makedirs(subdir, exist_ok=True)
 
-    # Compute convergence stats
-    stats = aggregate_convergence_stats(data_list, args.threshold, args.stable_window)
+    # Generate reports and plots for each dataset
+    for dataset in datasets:
+        # Filter data for this dataset
+        dataset_data = [d for d in data_list if d.dataset == dataset]
+        if not dataset_data:
+            continue
 
-    # Print summary to console
-    print_convergence_summary(stats, args.threshold)
+        # Compute stats for this dataset
+        dataset_stats = aggregate_convergence_stats(
+            dataset_data, args.threshold, args.stable_window
+        )
 
-    # Save markdown summary to top-level directory
-    save_markdown_summary(
-        stats, args.threshold, os.path.join(result_dir, "convergence_report.md")
-    )
+        # Print summary to console
+        print(f"\n{'#' * 40}")
+        print(f"# Dataset: {dataset.upper()}")
+        print(f"{'#' * 40}")
+        print_convergence_summary(dataset_stats, args.threshold)
+
+        # Save markdown summary to dataset directory
+        dataset_dir = os.path.join(result_dir, dataset)
+        os.makedirs(dataset_dir, exist_ok=True)
+        save_markdown_summary(
+            dataset_stats,
+            args.threshold,
+            os.path.join(dataset_dir, "convergence_report.md"),
+        )
 
     # Generate plots for each dataset/init combination
     for dataset in datasets:
