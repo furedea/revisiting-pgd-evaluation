@@ -824,14 +824,22 @@ def plot_convergence_cdf(
         n_never = int(np.sum(iters == NC_NEVER_REACHED))
         n_unstable = int(np.sum(iters == NC_UNSTABLE))
 
-        if len(converged) == 0:
-            continue
-        sorted_iters = np.sort(converged)
-        # CDF: fraction of total samples converged by iteration N
-        cdf = np.arange(1, len(sorted_iters) + 1) / n_total
         conv_rate = len(converged) / n_total * 100
         # Legend shows: model (n=total, conv%, NR:n, US:n)
         label = f"{model} (n={n_total}, {conv_rate:.0f}%, NR:{n_never}, US:{n_unstable})"
+
+        if len(converged) == 0:
+            # Add legend entry only (no visible line)
+            ax.plot([], [], color=colors[idx], linewidth=2, label=label)
+            continue
+
+        sorted_iters = np.sort(converged)
+        # CDF: fraction of total samples converged by iteration N
+        cdf = np.arange(1, len(sorted_iters) + 1) / n_total
+
+        # Use markers for small n_total to make points visible
+        marker = "o" if n_total <= 5 else None
+        markersize = 8 if n_total <= 5 else None
         ax.step(
             sorted_iters,
             cdf,
@@ -839,6 +847,8 @@ def plot_convergence_cdf(
             label=label,
             color=colors[idx],
             linewidth=2,
+            marker=marker,
+            markersize=markersize,
         )
 
     # Combined (excluding NC)
