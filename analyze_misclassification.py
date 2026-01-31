@@ -662,6 +662,12 @@ def plot_misclassification_cdf_overlay(
     fig, ax = plt.subplots(figsize=(12, 7))
 
     markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
+    # Line widths by model (nat thickest, adv thinnest)
+    linewidths = {"nat": 3.0, "weak_adv": 2.5, "nat_and_adv": 2.0, "adv": 1.5}
+    # Marker sizes by model
+    marker_sizes = {"nat": 140, "weak_adv": 120, "nat_and_adv": 100, "adv": 80}
+    # Z-order by model (nat on top)
+    zorders = {"nat": 14, "weak_adv": 13, "nat_and_adv": 12, "adv": 11}
     handles_labels = []
 
     for init in INIT_ORDER:
@@ -688,6 +694,9 @@ def plot_misclassification_cdf_overlay(
             # Use same color for same init, distinguish by linestyle
             color = get_color_for_init(init)
             linestyle = get_linestyle_for_model(model)
+            lw = linewidths.get(model, 2.0)
+            ms = marker_sizes.get(model, 100)
+            zo = zorders.get(model, 10)
 
             if len(misclassified) == 0:
                 handle = ax.plot([], [], color="lightgray", linewidth=1.5, linestyle="--")[0]
@@ -703,9 +712,9 @@ def plot_misclassification_cdf_overlay(
                     cdf,
                     color=color,
                     marker=markers.get(model, "o"),
-                    s=100,
+                    s=ms,
                     alpha=0.9,
-                    zorder=10,
+                    zorder=zo,
                     edgecolors="black",
                     linewidths=0.5,
                 )
@@ -715,9 +724,10 @@ def plot_misclassification_cdf_overlay(
                     cdf,
                     where="post",
                     color=color,
-                    linewidth=2.5,
+                    linewidth=lw,
                     linestyle=linestyle,
                     alpha=0.9,
+                    zorder=zo,
                 )[0]
             handles_labels.append((handle, label))
 
@@ -728,6 +738,7 @@ def plot_misclassification_cdf_overlay(
         handles, labels = zip(*handles_labels)
         ax.legend(handles, labels, loc="lower right", fontsize=7, ncol=2)
     ax.set_ylim(0, 1.05)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
