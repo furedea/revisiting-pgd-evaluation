@@ -449,9 +449,11 @@ def plot_misclassification_cdf(
     models = [m for m in MODEL_ORDER if m in all_iters_by_model]
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    colors = plt.cm.tab10(np.linspace(0, 1, len(models)))
+    colors = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
+    markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
+    linewidths = {"nat": 2.5, "nat_and_adv": 2.0, "adv": 1.5, "weak_adv": 1.0}
 
-    for idx, model in enumerate(models):
+    for model in models:
         iters = all_iters_by_model[model]
         misclassified = iters[iters >= 0]
         n_total = len(iters)
@@ -461,23 +463,23 @@ def plot_misclassification_cdf(
         label = f"{model} (n={n_total}, {attack_rate:.0f}%, failed:{n_not})"
 
         if len(misclassified) == 0:
-            ax.plot([], [], color=colors[idx], linewidth=2, label=label)
+            ax.plot([], [], color=colors.get(model, "gray"), linewidth=2, label=label)
             continue
 
         sorted_iters = np.sort(misclassified)
         cdf = np.arange(1, len(sorted_iters) + 1) / n_total
 
-        marker = "o" if n_total <= 5 else None
-        markersize = 8 if n_total <= 5 else None
         ax.step(
             sorted_iters,
             cdf,
             where="post",
             label=label,
-            color=colors[idx],
-            linewidth=2,
-            marker=marker,
-            markersize=markersize,
+            color=colors.get(model, "gray"),
+            linewidth=linewidths.get(model, 2),
+            marker=markers.get(model, None),
+            markersize=5,
+            markevery=max(1, len(sorted_iters) // 10),
+            alpha=0.9,
         )
 
     all_iters_flat = np.concatenate(list(all_iters_by_model.values()))
@@ -554,7 +556,7 @@ def plot_misclassification_histogram(
     n_bins = len(bin_edges) - 1
     bar_width = 0.8 / n_models
 
-    colors = plt.cm.tab10(np.linspace(0, 1, n_models))
+    colors = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
 
     for idx, model in enumerate(models):
         iters = all_iters_by_model[model]
@@ -568,90 +570,44 @@ def plot_misclassification_histogram(
             x_positions,
             counts,
             width=bar_width,
-            color=colors[idx],
+            color=colors.get(model, "gray"),
             alpha=0.8,
-            label=f"{model} (n={len(misclassified_iters)}/{len(iters)})",
+            label=f"{model} (success={len(misclassified_iters)}, fail={n_not_count})",
         )
 
-        fail_x = n_bins + idx * bar_width - (n_models - 1) * bar_width / 2
+        fail_x = n_bins + 1 + idx * bar_width - (n_models - 1) * bar_width / 2
         ax.bar(
-            fail_x, n_not_count, width=bar_width, color=colors[idx],
+            fail_x, n_not_count, width=bar_width, color=colors.get(model, "gray"),
             alpha=0.8, hatch="//",
         )
 
-    step = 10
-    x_tick_positions = list(range(0, n_bins, step)) + [n_bins]
-    x_tick_labels = [str(i) for i in range(0, n_bins, step)] + ["FAIL"]
+    if max_iter <= 20:
+        step = 5
+    elif max_iter <= 50:
+        step = 10
+    else:
+        step = 20
+    x_tick_positions = list(range(0, n_bins + 1, step))
+    if n_bins not in x_tick_positions:
+        x_tick_positions.append(n_bins)
+    x_tick_positions.append(n_bins + 1)
+    x_tick_labels = [str(i) for i in x_tick_positions[:-1]] + ["FAIL"]
     ax.set_xticks(x_tick_positions)
     ax.set_xticklabels(x_tick_labels)
 
-    ax.set_xlabel("Iteration (FAIL=never misclassified)")
+    ax.set_xlabel("First Misclassification Iteration (FAIL = attack failed)")
     ax.set_ylabel("Count")
     ax.set_title(
-        f"First Misclassification Distribution "
-        f"({dataset.upper()}, init={init}, single sample)"
+        f"First Misclassification Distribution ({dataset.upper()}, init={init}, single sample)"
     )
     ax.legend()
-    ax.set_xlim(-0.5, n_bins + 1.5)
+    ax.set_xlim(-0.5, n_bins + 2.5)
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"[SAVE] Misclassification histogram: {out_path}")
-
-
-def plot_single_model_histogram(
-    iters: np.ndarray,
-    model: str,
-    out_path: str,
-    dataset: str,
-    init: str,
-) -> None:
-    """Plot histogram of misclassification iterations for a single model."""
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    misclassified_iters = iters[iters >= 0]
-    n_not_count = int(np.sum(iters == NOT_MISCLASSIFIED))
-    n_total = len(iters)
-    n_misclassified = len(misclassified_iters)
-
-    if n_misclassified > 0:
-        max_iter = int(np.max(misclassified_iters))
-    else:
-        max_iter = 100
-
-    bin_edges = list(range(max_iter + 2))
-    n_bins = len(bin_edges) - 1
-
-    counts, _ = np.histogram(misclassified_iters, bins=bin_edges)
-    ax.bar(range(n_bins), counts, width=0.8, color="steelblue", alpha=0.8)
-
-    ax.bar(n_bins, n_not_count, width=0.8, color="salmon", alpha=0.8, label="FAIL")
-
-    step = 10
-    x_tick_positions = list(range(0, n_bins, step)) + [n_bins]
-    x_tick_labels = [str(i) for i in range(0, n_bins, step)] + ["FAIL"]
-    ax.set_xticks(x_tick_positions)
-    ax.set_xticklabels(x_tick_labels)
-
-    ax.set_xlabel("Iteration (FAIL=never misclassified)")
-    ax.set_ylabel("Count")
-    attack_rate = n_misclassified / n_total * 100 if n_total > 0 else 0
-    ax.set_title(
-        f"Misclassification Distribution "
-        f"({dataset.upper()}, init={init}, model={model}, "
-        f"n={n_total}, attack={attack_rate:.1f}%)"
-    )
-    ax.set_xlim(-0.5, n_bins + 1.5)
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    if n_not_count > 0:
-        ax.legend()
-
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"[SAVE] Single model histogram: {out_path}")
 
 
 def plot_misclassification_cdf_overlay(
@@ -662,8 +618,9 @@ def plot_misclassification_cdf_overlay(
     """Plot CDF overlay comparing all inits on one figure."""
     fig, ax = plt.subplots(figsize=(12, 7))
 
-    linestyles = {"clean": "-", "random": "--", "deepfool": "-.", "multi_deepfool": ":"}
-    colors_model = {"nat": "C0", "nat_and_adv": "C1", "weak_adv": "C2", "adv": "C3"}
+    linestyles = {"random": "-", "deepfool": "--", "multi_deepfool": "-."}
+    colors_model = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
+    markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
 
     for init in INIT_ORDER:
         if init not in stats_by_init:
@@ -700,11 +657,15 @@ def plot_misclassification_cdf_overlay(
                 color=colors_model.get(model, "gray"),
                 linestyle=linestyles.get(init, "-"),
                 linewidth=1.5,
+                marker=markers.get(model, None),
+                markersize=4,
+                markevery=max(1, len(sorted_iters) // 8),
+                alpha=0.9,
             )
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fraction misclassified")
-    ax.set_title(f"Misclassification CDF Overlay ({dataset.upper()}, all inits)")
+    ax.set_title(f"Misclassification CDF Overlay ({dataset.upper()}, all inits, single sample)")
     ax.legend(loc="lower right", fontsize=7, ncol=2)
     ax.set_ylim(0, 1.05)
     ax.grid(True, alpha=0.3)
@@ -798,21 +759,6 @@ def main() -> None:
                 dataset,
                 init,
             )
-
-            for model in MODEL_ORDER:
-                if model not in subset_stats:
-                    continue
-                model_iters = []
-                for init_key in subset_stats[model]:
-                    model_iters.extend(subset_stats[model][init_key].tolist())
-                if model_iters:
-                    plot_single_model_histogram(
-                        np.array(model_iters),
-                        model,
-                        os.path.join(subdir, f"misclassification_histogram_{model}.png"),
-                        dataset,
-                        init,
-                    )
 
     for dataset in datasets:
         if dataset in stats_by_dataset_init and stats_by_dataset_init[dataset]:
