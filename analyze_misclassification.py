@@ -682,8 +682,10 @@ def plot_misclassification_cdf_overlay(
 
     # CIFAR10: compute uniform x-offsets for all series (same offset at every x)
     if dataset == "cifar10":
-        # Count valid (non-failed) combinations
-        valid_combinations = []
+        # Collect valid combinations, separating points (n=1) and lines (n>1)
+        point_combinations = []  # clean, deepfool (n=1)
+        line_combinations = []   # random, multi_deepfool (n>1)
+
         for init in INIT_ORDER:
             if init not in stats_by_init:
                 continue
@@ -698,12 +700,19 @@ def plot_misclassification_cdf_overlay(
                     continue
                 iters = np.array(model_iters)
                 misclassified = iters[iters >= 0]
+                n_total = len(iters)
                 if len(misclassified) > 0:
-                    valid_combinations.append((init, model))
+                    if n_total == 1:
+                        point_combinations.append((init, model))
+                    else:
+                        line_combinations.append((init, model))
+
+        # Order: points first, then lines (so they group together)
+        valid_combinations = point_combinations + line_combinations
 
         n_valid = len(valid_combinations)
-        # Very tight offset (0.02 per item, centered)
-        offset_width = 0.02
+        # Very tight offset (0.01 per item, centered)
+        offset_width = 0.01
         if n_valid > 1:
             offsets = {
                 combo: (i - (n_valid - 1) / 2) * offset_width
