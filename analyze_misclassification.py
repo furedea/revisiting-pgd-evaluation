@@ -587,33 +587,57 @@ def plot_misclassification_histogram(
     print(f"[SAVE] Misclassification histogram: {out_path}")
 
 
-def get_color_for_init_model(init: str, model: str) -> str:
-    """Get distinct color for each init/model combination.
+def get_color_for_init(init: str) -> str:
+    """Get color for each init type (4 colors for init comparison).
 
-    Uses highly distinguishable colors for clear visual separation.
-    Organized by init, then by model within each init.
+    Uses highly distinguishable, saturated colors for clear visual separation.
     """
     colors = {
-        # clean: blue tones
-        ("clean", "nat"): "#0000FF",          # blue
-        ("clean", "nat_and_adv"): "#00BFFF",  # deep sky blue
-        ("clean", "adv"): "#000080",          # navy
-        ("clean", "weak_adv"): "#87CEEB",     # sky blue
-        # random: green tones
-        ("random", "nat"): "#008000",         # green
-        ("random", "nat_and_adv"): "#00FF00", # lime
-        ("random", "adv"): "#006400",         # dark green
-        ("random", "weak_adv"): "#90EE90",    # light green
-        # deepfool: red/pink tones
-        ("deepfool", "nat"): "#FF0000",       # red
-        ("deepfool", "nat_and_adv"): "#FF69B4", # hot pink
-        ("deepfool", "adv"): "#8B0000",       # dark red
-        ("deepfool", "weak_adv"): "#FFC0CB",  # pink
-        # multi_deepfool: orange/yellow/brown tones
-        ("multi_deepfool", "nat"): "#FF8C00",     # dark orange
-        ("multi_deepfool", "nat_and_adv"): "#FFD700", # gold
-        ("multi_deepfool", "adv"): "#8B4513",     # saddle brown
-        ("multi_deepfool", "weak_adv"): "#FFFF00", # yellow
+        "clean": "#0000CD",         # medium blue
+        "random": "#228B22",        # forest green
+        "deepfool": "#DC143C",      # crimson
+        "multi_deepfool": "#FF8C00",  # dark orange
+    }
+    return colors.get(init, "gray")
+
+
+def get_linestyle_for_init(init: str) -> str:
+    """Get line style for each init type."""
+    styles = {
+        "clean": "-",           # solid
+        "random": "--",         # dashed
+        "deepfool": "-.",       # dash-dot
+        "multi_deepfool": ":",  # dotted
+    }
+    return styles.get(init, "-")
+
+
+def get_color_for_init_model(init: str, model: str) -> str:
+    """Get distinct color for each init/model combination (legacy, for overlay).
+
+    Uses highly distinguishable, saturated colors for clear visual separation.
+    """
+    colors = {
+        # clean: blue系 (濃い色のみ)
+        ("clean", "nat"): "#0000CD",          # medium blue
+        ("clean", "nat_and_adv"): "#4169E1",  # royal blue
+        ("clean", "adv"): "#1E90FF",          # dodger blue
+        ("clean", "weak_adv"): "#00CED1",     # dark turquoise
+        # random: green系 (濃い色のみ)
+        ("random", "nat"): "#228B22",         # forest green
+        ("random", "nat_and_adv"): "#32CD32", # lime green
+        ("random", "adv"): "#008B8B",         # dark cyan
+        ("random", "weak_adv"): "#2E8B57",    # sea green
+        # deepfool: red/magenta系 (濃い色のみ)
+        ("deepfool", "nat"): "#DC143C",       # crimson
+        ("deepfool", "nat_and_adv"): "#FF1493", # deep pink
+        ("deepfool", "adv"): "#C71585",       # medium violet red
+        ("deepfool", "weak_adv"): "#DB7093",  # pale violet red
+        # multi_deepfool: orange/brown系 (濃い色のみ)
+        ("multi_deepfool", "nat"): "#FF4500",     # orange red
+        ("multi_deepfool", "nat_and_adv"): "#FF8C00", # dark orange
+        ("multi_deepfool", "adv"): "#B8860B",     # dark goldenrod
+        ("multi_deepfool", "weak_adv"): "#DAA520", # goldenrod
     }
     return colors.get((init, model), "gray")
 
@@ -624,7 +648,7 @@ def get_linestyle_for_model(model: str) -> str:
         "nat": "-",
         "nat_and_adv": "--",
         "adv": "-.",
-        "weak_adv": ":",
+        "weak_adv": (0, (3, 1)),  # より密な点線
     }
     return styles.get(model, "-")
 
@@ -664,8 +688,8 @@ def plot_misclassification_cdf_overlay(
             color = get_color_for_init_model(init, model)
 
             if len(misclassified) == 0:
-                handle = ax.plot([], [], color="lightgray", linewidth=1.0, linestyle="--")[0]
-                handles_labels.append((handle, label))
+                handle = ax.plot([], [], color="lightgray", linewidth=1.5, linestyle="--")[0]
+                handles_labels.append((handle, label + " [FAILED]"))
                 continue
 
             sorted_iters = np.sort(misclassified)
@@ -756,10 +780,17 @@ def plot_misclassification_histogram_overlay(
         misclassified_iters = iters[iters >= 0]
         n_not_count = int(np.sum(iters == NOT_MISCLASSIFIED))
         n_total = len(iters)
-        attack_rate = len(misclassified_iters) / n_total * 100 if n_total > 0 else 0
+        n_success = len(misclassified_iters)
+        attack_rate = n_success / n_total * 100 if n_total > 0 else 0
 
         counts, _ = np.histogram(misclassified_iters, bins=bin_edges)
-        color = get_color_for_init_model(init, model)
+
+        if n_success == 0:
+            color = "lightgray"
+            label_suffix = " [FAILED]"
+        else:
+            color = get_color_for_init_model(init, model)
+            label_suffix = ""
 
         x_positions = np.arange(n_bins) + idx * bar_width - (n_groups - 1) * bar_width / 2
         ax.bar(
@@ -769,14 +800,14 @@ def plot_misclassification_histogram_overlay(
             color=color,
             alpha=0.9,
             edgecolor="black",
-            linewidth=0.3,
-            label=f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_not_count})",
+            linewidth=0.5,
+            label=f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_not_count}){label_suffix}",
         )
 
         fail_x = n_bins + 1.5 + idx * bar_width - (n_groups - 1) * bar_width / 2
         ax.bar(
             fail_x, n_not_count, width=bar_width, color=color,
-            alpha=0.9, hatch="//", edgecolor="black", linewidth=0.3,
+            alpha=0.9, hatch="//", edgecolor="black", linewidth=0.5,
         )
 
     if max_iter <= 20:
@@ -806,6 +837,275 @@ def plot_misclassification_histogram_overlay(
     print(f"[SAVE] Misclassification histogram overlay: {out_path}")
 
 
+def plot_model_comparison_boxplot(
+    stats_by_model: Dict[str, Dict[str, Dict[str, np.ndarray]]],
+    out_path: str,
+    dataset: str,
+) -> None:
+    """Plot boxplot comparing models for each init type (2x2 subplots).
+
+    Each subplot shows one init type with 4 model boxplots side by side.
+    This allows quick visual comparison: nat < weak_adv < nat_and_adv <= adv
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes_flat = axes.flatten()
+
+    model_colors = {
+        "nat": "#1f77b4",
+        "nat_and_adv": "#ff7f0e",
+        "adv": "#2ca02c",
+        "weak_adv": "#d62728",
+    }
+
+    for idx, init in enumerate(INIT_ORDER):
+        ax = axes_flat[idx]
+        box_data = []
+        box_labels = []
+        box_colors = []
+        n_total_list = []
+        n_failed_list = []
+
+        for model in MODEL_ORDER:
+            if model not in stats_by_model:
+                continue
+            stats = stats_by_model[model]
+            if init not in stats:
+                continue
+
+            iters = stats[init]
+            misclassified = iters[iters >= 0]
+            n_total = len(iters)
+            n_failed = int(np.sum(iters == NOT_MISCLASSIFIED))
+
+            if len(misclassified) > 0:
+                box_data.append(misclassified)
+            else:
+                box_data.append([])
+
+            box_labels.append(model)
+            box_colors.append(model_colors.get(model, "gray"))
+            n_total_list.append(n_total)
+            n_failed_list.append(n_failed)
+
+        if not box_data:
+            ax.set_title(f"{init}: No data")
+            ax.set_visible(False)
+            continue
+
+        positions = list(range(1, len(box_data) + 1))
+        bp = ax.boxplot(
+            box_data,
+            positions=positions,
+            patch_artist=True,
+            widths=0.6,
+            showfliers=True,
+            flierprops={"marker": "o", "markersize": 4, "alpha": 0.5},
+        )
+
+        for patch, color in zip(bp["boxes"], box_colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+
+        for median in bp["medians"]:
+            median.set_color("black")
+            median.set_linewidth(2)
+
+        ax.set_xticks(positions)
+        x_labels = []
+        for i, label in enumerate(box_labels):
+            n_total = n_total_list[i]
+            n_failed = n_failed_list[i]
+            attack_rate = (n_total - n_failed) / n_total * 100 if n_total > 0 else 0
+            x_labels.append(f"{label}\n(n={n_total}, {attack_rate:.0f}%)")
+        ax.set_xticklabels(x_labels, fontsize=8)
+
+        ax.set_ylabel("First Misclassification Iteration")
+        ax.set_title(f"{init}", fontweight="bold", fontsize=11)
+        ax.grid(True, axis="y", alpha=0.3)
+        ax.set_ylim(bottom=0)
+
+    fig.suptitle(
+        f"Model Comparison by Init Type ({dataset.upper()})\n"
+        "Expected trend: nat < weak_adv < nat_and_adv ≤ adv",
+        fontsize=12,
+        fontweight="bold",
+    )
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90)
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] Model comparison boxplot: {out_path}")
+
+
+def plot_init_comparison_cdf(
+    stats: Dict[str, np.ndarray],
+    out_path: str,
+    dataset: str,
+    model: str,
+) -> None:
+    """Plot CDF comparing inits within a single model."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    handles_labels = []
+
+    for init in INIT_ORDER:
+        if init not in stats:
+            continue
+
+        iters = stats[init]
+        misclassified = iters[iters >= 0]
+        n_total = len(iters)
+        n_failed = int(np.sum(iters == NOT_MISCLASSIFIED))
+
+        attack_rate = len(misclassified) / n_total * 100 if n_total > 0 else 0
+        label = f"{init} (n={n_total}, {attack_rate:.0f}%, fail={n_failed})"
+        color = get_color_for_init(init)
+        linestyle = get_linestyle_for_init(init)
+
+        if len(misclassified) == 0:
+            handle = ax.plot([], [], color="lightgray", linewidth=1.5, linestyle="--")[0]
+            handles_labels.append((handle, label + " [FAILED]"))
+            continue
+
+        sorted_iters = np.sort(misclassified)
+        cdf = np.arange(1, len(sorted_iters) + 1) / n_total
+
+        if n_total == 1:
+            handle = ax.scatter(
+                sorted_iters,
+                cdf,
+                color=color,
+                marker="o",
+                s=100,
+                alpha=0.9,
+                zorder=10,
+                edgecolors="black",
+                linewidths=0.5,
+            )
+        else:
+            handle = ax.step(
+                sorted_iters,
+                cdf,
+                where="post",
+                color=color,
+                linewidth=2.5,
+                linestyle=linestyle,
+                alpha=0.9,
+            )[0]
+        handles_labels.append((handle, label))
+
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Fraction misclassified")
+    ax.set_title(f"Misclassification CDF ({dataset.upper()}, model={model})")
+
+    if handles_labels:
+        handles, labels = zip(*handles_labels)
+        ax.legend(handles, labels, loc="lower right", fontsize=9)
+
+    ax.set_ylim(0, 1.05)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] Init comparison CDF: {out_path}")
+
+
+def plot_init_comparison_histogram(
+    stats: Dict[str, np.ndarray],
+    out_path: str,
+    dataset: str,
+    model: str,
+) -> None:
+    """Plot histogram comparing inits within a single model."""
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    all_data = []
+    for init in INIT_ORDER:
+        if init not in stats:
+            continue
+        all_data.append((init, stats[init]))
+
+    if not all_data:
+        print(f"[WARN] No data for histogram: {model}")
+        plt.close()
+        return
+
+    all_misclassified = []
+    for _, iters in all_data:
+        misclassified = iters[iters >= 0]
+        all_misclassified.extend(misclassified.tolist())
+
+    if all_misclassified:
+        max_iter = int(np.max(all_misclassified))
+    else:
+        max_iter = 100
+
+    bin_edges = list(range(max_iter + 2))
+    n_bins = len(bin_edges) - 1
+    n_groups = len(all_data)
+    bar_width = 0.8 / n_groups
+
+    for idx, (init, iters) in enumerate(all_data):
+        misclassified_iters = iters[iters >= 0]
+        n_not_count = int(np.sum(iters == NOT_MISCLASSIFIED))
+        n_total = len(iters)
+        n_success = len(misclassified_iters)
+        attack_rate = n_success / n_total * 100 if n_total > 0 else 0
+
+        counts, _ = np.histogram(misclassified_iters, bins=bin_edges)
+
+        if n_success == 0:
+            color = "lightgray"
+        else:
+            color = get_color_for_init(init)
+
+        x_positions = np.arange(n_bins) + idx * bar_width - (n_groups - 1) * bar_width / 2
+        ax.bar(
+            x_positions,
+            counts,
+            width=bar_width,
+            color=color,
+            alpha=0.85,
+            edgecolor="black",
+            linewidth=0.5,
+            label=f"{init} (n={n_total}, {attack_rate:.0f}%, fail={n_not_count})",
+        )
+
+        fail_x = n_bins + 1.5 + idx * bar_width - (n_groups - 1) * bar_width / 2
+        ax.bar(
+            fail_x, n_not_count, width=bar_width, color=color,
+            alpha=0.85, hatch="//", edgecolor="black", linewidth=0.5,
+        )
+
+    if max_iter <= 20:
+        step = 5
+    elif max_iter <= 50:
+        step = 10
+    else:
+        step = 20
+    x_tick_positions = list(range(0, n_bins + 1, step))
+    if n_bins not in x_tick_positions:
+        x_tick_positions.append(n_bins)
+    x_tick_positions.append(n_bins + 1.5)
+    x_tick_labels = [str(i) for i in x_tick_positions[:-1]] + ["FAIL"]
+    ax.set_xticks(x_tick_positions)
+    ax.set_xticklabels(x_tick_labels)
+
+    ax.set_xlabel("First Misclassification Iteration (FAIL = attack failed)")
+    ax.set_ylabel("Count")
+    ax.set_title(f"First Misclassification Distribution ({dataset.upper()}, model={model})")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.set_xlim(-0.5, n_bins + 3)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] Init comparison histogram: {out_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Analyze misclassification speed from corrects arrays"
@@ -833,11 +1133,12 @@ def main() -> None:
         return
 
     datasets = sorted(set(d.dataset for d in data_list))
-    inits = sorted(set(d.init for d in data_list))
+    models = sorted(set(d.model for d in data_list))
 
+    # Create model directories (new structure: dataset/model/)
     for dataset in datasets:
-        for init in inits:
-            subdir = os.path.join(result_dir, dataset, init)
+        for model in models:
+            subdir = os.path.join(result_dir, dataset, model)
             os.makedirs(subdir, exist_ok=True)
 
     for dataset in datasets:
@@ -860,40 +1161,75 @@ def main() -> None:
             dataset,
         )
 
+    # stats_by_dataset_model[dataset][model][init] = array of first misclassification iterations
+    stats_by_dataset_model: Dict[str, Dict[str, Dict[str, np.ndarray]]] = {}
+    # stats_by_dataset_init[dataset][init][model][init] for overlay (legacy structure)
     stats_by_dataset_init: Dict[str, Dict[str, Dict[str, Dict[str, np.ndarray]]]] = {}
 
     for dataset in datasets:
+        stats_by_dataset_model[dataset] = {}
         stats_by_dataset_init[dataset] = {}
-        for init in inits:
-            subdir = os.path.join(result_dir, dataset, init)
 
+        for model in MODEL_ORDER:
+            subset_data = [
+                d for d in data_list if d.dataset == dataset and d.model == model
+            ]
+            if not subset_data:
+                continue
+
+            # Aggregate by init within this model
+            init_stats: Dict[str, List[int]] = {}
+            for data in subset_data:
+                if data.init not in init_stats:
+                    init_stats[data.init] = []
+                first_wrong = compute_first_misclassification(data.corrects)
+                init_stats[data.init].extend(first_wrong.tolist())
+
+            model_stats: Dict[str, np.ndarray] = {}
+            for init in init_stats:
+                model_stats[init] = np.array(init_stats[init])
+
+            stats_by_dataset_model[dataset][model] = model_stats
+
+            # Generate init comparison plots within each model directory
+            subdir = os.path.join(result_dir, dataset, model)
+
+            # CDF: skip if all inits are single-point (clean, deepfool)
+            has_multi_point = any(
+                init in model_stats and len(model_stats[init]) > 1
+                for init in ["random", "multi_deepfool"]
+            )
+            if has_multi_point:
+                plot_init_comparison_cdf(
+                    model_stats,
+                    os.path.join(subdir, "misclassification_cdf.png"),
+                    dataset,
+                    model,
+                )
+
+            plot_init_comparison_histogram(
+                model_stats,
+                os.path.join(subdir, "misclassification_histogram.png"),
+                dataset,
+                model,
+            )
+
+        # Build legacy structure for overlay (init -> model -> init)
+        inits = sorted(set(d.init for d in data_list if d.dataset == dataset))
+        for init in inits:
             subset_data = [
                 d for d in data_list if d.dataset == dataset and d.init == init
             ]
             if not subset_data:
                 continue
-
             subset_stats = aggregate_misclassification_stats(subset_data)
             stats_by_dataset_init[dataset][init] = subset_stats
 
-            if init not in ("clean", "deepfool"):
-                plot_misclassification_cdf(
-                    subset_stats,
-                    os.path.join(subdir, "misclassification_cdf.png"),
-                    dataset,
-                    init,
-                )
-
-            plot_misclassification_histogram(
-                subset_stats,
-                os.path.join(subdir, "misclassification_histogram.png"),
-                dataset,
-                init,
-            )
-
     for dataset in datasets:
+        dataset_dir = os.path.join(result_dir, dataset)
+
+        # Generate overlay plots
         if dataset in stats_by_dataset_init and stats_by_dataset_init[dataset]:
-            dataset_dir = os.path.join(result_dir, dataset)
             plot_misclassification_cdf_overlay(
                 stats_by_dataset_init[dataset],
                 os.path.join(dataset_dir, "misclassification_cdf_overlay.png"),
@@ -902,6 +1238,14 @@ def main() -> None:
             plot_misclassification_histogram_overlay(
                 stats_by_dataset_init[dataset],
                 os.path.join(dataset_dir, "misclassification_histogram_overlay.png"),
+                dataset,
+            )
+
+        # Generate model comparison boxplot (new)
+        if dataset in stats_by_dataset_model and stats_by_dataset_model[dataset]:
+            plot_model_comparison_boxplot(
+                stats_by_dataset_model[dataset],
+                os.path.join(dataset_dir, "model_comparison_boxplot.png"),
                 dataset,
             )
 
