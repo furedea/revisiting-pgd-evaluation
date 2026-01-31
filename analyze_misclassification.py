@@ -21,7 +21,7 @@ import numpy as np
 matplotlib.use("Agg")
 
 MODEL_ORDER = ["nat", "nat_and_adv", "adv", "weak_adv"]
-INIT_ORDER = ["random", "deepfool", "multi_deepfool"]
+INIT_ORDER = ["clean", "random", "deepfool", "multi_deepfool"]
 
 NOT_MISCLASSIFIED = -1
 
@@ -479,26 +479,6 @@ def plot_misclassification_cdf(
             alpha=0.85,
         )
 
-    all_iters_flat = np.concatenate(list(all_iters_by_model.values()))
-    all_misclassified = all_iters_flat[all_iters_flat >= 0]
-    n_total_all = len(all_iters_flat)
-    n_not_all = int(np.sum(all_iters_flat == NOT_MISCLASSIFIED))
-
-    if len(all_misclassified) > 0:
-        all_sorted = np.sort(all_misclassified)
-        cdf_combined = np.arange(1, len(all_sorted) + 1) / n_total_all
-        attack_rate_all = len(all_misclassified) / n_total_all * 100
-        label_all = f"ALL (n={n_total_all}, {attack_rate_all:.0f}%, failed:{n_not_all})"
-        ax.step(
-            all_sorted,
-            cdf_combined,
-            where="post",
-            label=label_all,
-            color="black",
-            linewidth=2,
-            linestyle="--",
-        )
-
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fraction misclassified")
     ax.set_title(
@@ -615,9 +595,10 @@ def plot_misclassification_cdf_overlay(
     """Plot CDF overlay comparing all inits on one figure."""
     fig, ax = plt.subplots(figsize=(12, 7))
 
-    linestyles = {"random": "-", "deepfool": "--", "multi_deepfool": "-."}
+    linestyles = {"clean": "-", "random": "--", "deepfool": "-.", "multi_deepfool": ":"}
     colors_model = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
     markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
+    linewidths = {"nat": 2.5, "nat_and_adv": 2.0, "adv": 1.5, "weak_adv": 1.0}
 
     for init in INIT_ORDER:
         if init not in stats_by_init:
@@ -646,19 +627,28 @@ def plot_misclassification_cdf_overlay(
             attack_rate = len(misclassified) / n_total * 100
             label = f"{model}/{init} ({attack_rate:.0f}%)"
 
-            ax.step(
-                sorted_iters,
-                cdf,
-                where="post",
-                label=label,
-                color=colors_model.get(model, "gray"),
-                linestyle=linestyles.get(init, "-"),
-                linewidth=1.5,
-                marker=markers.get(model, None),
-                markersize=4,
-                markevery=max(1, len(sorted_iters) // 8),
-                alpha=0.9,
-            )
+            if n_total == 1:
+                ax.scatter(
+                    sorted_iters,
+                    cdf,
+                    label=label,
+                    color=colors_model.get(model, "gray"),
+                    marker=markers.get(model, "o"),
+                    s=80,
+                    alpha=0.9,
+                    zorder=10,
+                )
+            else:
+                ax.step(
+                    sorted_iters,
+                    cdf,
+                    where="post",
+                    label=label,
+                    color=colors_model.get(model, "gray"),
+                    linestyle=linestyles.get(init, "-"),
+                    linewidth=linewidths.get(model, 1.5),
+                    alpha=0.85,
+                )
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Fraction misclassified")
@@ -743,12 +733,13 @@ def main() -> None:
             subset_stats = aggregate_misclassification_stats(subset_data)
             stats_by_dataset_init[dataset][init] = subset_stats
 
-            plot_misclassification_cdf(
-                subset_stats,
-                os.path.join(subdir, "misclassification_cdf.png"),
-                dataset,
-                init,
-            )
+            if init not in ("clean", "deepfool"):
+                plot_misclassification_cdf(
+                    subset_stats,
+                    os.path.join(subdir, "misclassification_cdf.png"),
+                    dataset,
+                    init,
+                )
 
             plot_misclassification_histogram(
                 subset_stats,

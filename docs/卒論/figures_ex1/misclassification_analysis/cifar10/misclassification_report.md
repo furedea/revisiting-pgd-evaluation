@@ -20,9 +20,9 @@
 | nat_and_adv | random | 100%(20/20) | 1.0 | 1.0 | 1.0 | 1 | 20 | 0%(0) |
 | nat_and_adv | deepfool | 100%(1/1) | 0.0 | 0.0 | 0.0 | 0 | 1 | 0%(0) |
 | nat_and_adv | multi_deepfool | 100%(9/9) | 0.0 | 0.0 | 0.0 | 0 | 9 | 0%(0) |
-| adv | random | 100%(20/20) | 0.0 | 0.0 | 0.0 | 0 | 20 | 0%(0) |
-| adv | deepfool | 100%(1/1) | 0.0 | 0.0 | 0.0 | 0 | 1 | 0%(0) |
-| adv | multi_deepfool | 100%(9/9) | 0.0 | 0.0 | 0.0 | 0 | 9 | 0%(0) |
+| adv | random | 0%(0/20) | N/A | N/A | N/A | N/A | 20 | 100%(20) |
+| adv | deepfool | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
+| adv | multi_deepfool | 0%(0/9) | N/A | N/A | N/A | N/A | 9 | 100%(9) |
 | weak_adv | random | 100%(20/20) | 2.0 | 2.0 | 2.0 | 2 | 20 | 0%(0) |
 | weak_adv | deepfool | 100%(1/1) | 1.0 | 1.0 | 1.0 | 1 | 1 | 0%(0) |
 | weak_adv | multi_deepfool | 100%(9/9) | 0.1 | 0.0 | 0.6 | 1 | 9 | 0%(0) |
@@ -33,18 +33,18 @@
 |-------|------------:|-----:|-------:|----:|----:|--:|-------:|
 | nat | 100%(31/31) | 1.0 | 1.0 | 2.0 | 2 | 31 | 0%(0) |
 | nat_and_adv | 100%(31/31) | 0.7 | 1.0 | 1.0 | 1 | 31 | 0%(0) |
-| adv | 100%(31/31) | 0.0 | 0.0 | 0.0 | 0 | 31 | 0%(0) |
+| adv | 0%(0/31) | N/A | N/A | N/A | N/A | 31 | 100%(31) |
 | weak_adv | 100%(31/31) | 1.4 | 2.0 | 2.0 | 2 | 31 | 0%(0) |
 
 ## Overall Summary (All Models Combined)
 
 | Metric | Value |
 |--------|------:|
-| Attack Success Rate | 100%(120/120) |
+| Attack Success Rate | 75%(90/120) |
 | Total samples | 120 |
-| Misclassified | 120 |
-| Failed (never misclassified) | 0%(0) |
-| Mean iteration | 0.8 |
+| Misclassified | 90 |
+| Failed (never misclassified) | 25%(30) |
+| Mean iteration | 1.0 |
 | Median iteration | 1.0 |
 | P95 iteration | 2.0 |
 | Max iteration | 2 |
