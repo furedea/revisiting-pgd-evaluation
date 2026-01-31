@@ -144,14 +144,15 @@ def compute_first_misclassification(corrects: np.ndarray) -> np.ndarray:
     """Compute iteration where first misclassification occurs for each restart.
 
     Args:
-        corrects: shape (restarts, iterations+1), bool array where True means correct
+        corrects: shape (restarts, iterations+1), where True/1 means correct classification
 
     Returns:
         first_wrong: shape (restarts,)
             >= 0: iteration index of first misclassification
             NOT_MISCLASSIFIED (-1): never misclassified (attack failed)
     """
-    wrong = ~corrects
+    corrects_bool = corrects.astype(bool)
+    wrong = ~corrects_bool
     any_wrong = np.any(wrong, axis=1)
     first_wrong_iter = np.argmax(wrong, axis=1).astype(np.int32)
     first_wrong_iter[~any_wrong] = NOT_MISCLASSIFIED
@@ -450,8 +451,7 @@ def plot_misclassification_cdf(
     fig, ax = plt.subplots(figsize=(10, 6))
 
     colors = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
-    markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
-    linewidths = {"nat": 2.5, "nat_and_adv": 2.0, "adv": 1.5, "weak_adv": 1.0}
+    linewidths = {"nat": 3.0, "nat_and_adv": 2.5, "adv": 2.0, "weak_adv": 1.5}
 
     for model in models:
         iters = all_iters_by_model[model]
@@ -476,10 +476,7 @@ def plot_misclassification_cdf(
             label=label,
             color=colors.get(model, "gray"),
             linewidth=linewidths.get(model, 2),
-            marker=markers.get(model, None),
-            markersize=5,
-            markevery=max(1, len(sorted_iters) // 10),
-            alpha=0.9,
+            alpha=0.85,
         )
 
     all_iters_flat = np.concatenate(list(all_iters_by_model.values()))
