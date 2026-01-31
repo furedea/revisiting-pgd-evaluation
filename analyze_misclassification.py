@@ -838,16 +838,15 @@ def plot_misclassification_histogram_overlay(
     print(f"[SAVE] Misclassification histogram overlay: {out_path}")
 
 
-def plot_model_comparison_barplot(
+def plot_model_comparison_strip(
     stats_by_model: Dict[str, Dict[str, Dict[str, np.ndarray]]],
     out_path: str,
     dataset: str,
 ) -> None:
-    """Plot attack success rate bar chart comparing models for each init type (2x2 subplots).
+    """Plot strip plot comparing misclassification speed for each init type (2x2 subplots).
 
-    Each subplot shows one init type with 4 model bars side by side.
-    This allows quick visual comparison: nat < weak_adv < nat_and_adv <= adv
-    Attack success rate is used instead of iteration count to handle models that rarely misclassify.
+    Each subplot shows one init type with data points for each model.
+    Models that never misclassified show N/A.
     """
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     axes_flat = axes.flatten()
@@ -861,13 +860,9 @@ def plot_model_comparison_barplot(
 
     for idx, init in enumerate(INIT_ORDER):
         ax = axes_flat[idx]
-        attack_rates = []
-        bar_labels = []
-        bar_colors = []
-        n_total_list = []
-        n_success_list = []
+        all_y_max = 0
 
-        for model in MODEL_ORDER:
+        for model_idx, model in enumerate(MODEL_ORDER):
             if model not in stats_by_model:
                 continue
             stats = stats_by_model[model]
@@ -876,57 +871,66 @@ def plot_model_comparison_barplot(
 
             iters = stats[init]
             misclassified = iters[iters >= 0]
-            n_total = len(iters)
-            n_success = len(misclassified)
-            attack_rate = n_success / n_total * 100 if n_total > 0 else 0
+            color = model_colors.get(model, "gray")
 
-            attack_rates.append(attack_rate)
-            bar_labels.append(model)
-            bar_colors.append(model_colors.get(model, "gray"))
-            n_total_list.append(n_total)
-            n_success_list.append(n_success)
+            if len(misclassified) > 0:
+                # Add jitter to x position to avoid overlap
+                jitter = np.random.uniform(-0.15, 0.15, size=len(misclassified))
+                x_positions = model_idx + jitter
 
-        if not attack_rates:
-            ax.set_title(f"{init}: No data")
-            ax.set_visible(False)
-            continue
+                ax.scatter(
+                    x_positions,
+                    misclassified,
+                    color=color,
+                    alpha=0.7,
+                    s=40,
+                    edgecolors="black",
+                    linewidths=0.3,
+                    label=f"{model} (n={len(misclassified)})",
+                )
 
-        positions = list(range(len(attack_rates)))
-        bars = ax.bar(
-            positions,
-            attack_rates,
-            color=bar_colors,
-            alpha=0.8,
-            edgecolor="black",
-            linewidth=0.8,
-            width=0.6,
-        )
+                # Add median marker
+                median_val = np.median(misclassified)
+                ax.scatter(
+                    model_idx,
+                    median_val,
+                    color=color,
+                    marker="_",
+                    s=300,
+                    linewidths=3,
+                    zorder=10,
+                )
 
-        # Add value labels on bars
-        for bar, rate, n_total, n_success in zip(bars, attack_rates, n_total_list, n_success_list):
-            height = bar.get_height()
-            ax.annotate(
-                f"{rate:.0f}%\n({n_success}/{n_total})",
-                xy=(bar.get_x() + bar.get_width() / 2, height),
-                xytext=(0, 3),
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-                fontsize=9,
-                fontweight="bold",
-            )
+                all_y_max = max(all_y_max, np.max(misclassified))
+            else:
+                # No misclassification - show N/A
+                ax.annotate(
+                    "N/A",
+                    xy=(model_idx, 0),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="center",
+                    va="bottom",
+                    fontsize=10,
+                    fontweight="bold",
+                    color="gray",
+                )
 
-        ax.set_xticks(positions)
-        ax.set_xticklabels(bar_labels, fontsize=10)
-        ax.set_ylabel("Attack Success Rate (%)")
+        ax.set_xticks(range(len(MODEL_ORDER)))
+        ax.set_xticklabels(MODEL_ORDER, fontsize=9)
+        ax.set_ylabel("First Misclassification Iteration")
         ax.set_title(f"{init}", fontweight="bold", fontsize=11)
-        ax.set_ylim(0, 115)  # Leave room for labels
         ax.grid(True, axis="y", alpha=0.3)
-        ax.axhline(y=100, color="gray", linestyle="--", alpha=0.5, linewidth=1)
+        ax.set_xlim(-0.5, len(MODEL_ORDER) - 0.5)
+
+        if all_y_max > 0:
+            ax.set_ylim(0, all_y_max * 1.1)
+        else:
+            ax.set_ylim(0, 10)
 
     fig.suptitle(
-        f"Attack Success Rate by Model ({dataset.upper()})\n"
-        "Expected trend: nat > weak_adv > nat_and_adv ≥ adv (higher = more vulnerable)",
+        f"Misclassification Speed by Model ({dataset.upper()})\n"
+        "Each dot = one sample, horizontal line = median",
         fontsize=12,
         fontweight="bold",
     )
@@ -935,7 +939,7 @@ def plot_model_comparison_barplot(
     plt.subplots_adjust(top=0.90)
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"[SAVE] Model comparison barplot: {out_path}")
+    print(f"[SAVE] Model comparison strip plot: {out_path}")
 
 
 def plot_init_comparison_cdf(
@@ -1241,11 +1245,11 @@ def main() -> None:
                 dataset,
             )
 
-        # Generate model comparison bar chart (attack success rate)
+        # Generate model comparison strip plot
         if dataset in stats_by_dataset_model and stats_by_dataset_model[dataset]:
-            plot_model_comparison_barplot(
+            plot_model_comparison_strip(
                 stats_by_dataset_model[dataset],
-                os.path.join(dataset_dir, "model_comparison_barplot.png"),
+                os.path.join(dataset_dir, "model_comparison_strip.png"),
                 dataset,
             )
 
