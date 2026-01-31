@@ -590,31 +590,43 @@ def plot_misclassification_histogram(
 def get_color_for_init_model(init: str, model: str) -> str:
     """Get distinct color for each init/model combination.
 
-    Colors are grouped by init for visual clarity:
-    - clean: blue shades
-    - random: green shades
-    - deepfool: red shades
-    - multi_deepfool: orange/yellow shades
+    Uses highly distinguishable colors for clear visual separation.
+    Organized by init, then by model within each init.
     """
     colors = {
-        ("clean", "nat"): "#08519c",
-        ("clean", "nat_and_adv"): "#3182bd",
-        ("clean", "adv"): "#6baed6",
-        ("clean", "weak_adv"): "#bdd7e7",
-        ("random", "nat"): "#006d2c",
-        ("random", "nat_and_adv"): "#31a354",
-        ("random", "adv"): "#74c476",
-        ("random", "weak_adv"): "#bae4b3",
-        ("deepfool", "nat"): "#a50f15",
-        ("deepfool", "nat_and_adv"): "#de2d26",
-        ("deepfool", "adv"): "#fb6a4a",
-        ("deepfool", "weak_adv"): "#fcae91",
-        ("multi_deepfool", "nat"): "#d94801",
-        ("multi_deepfool", "nat_and_adv"): "#f16913",
-        ("multi_deepfool", "adv"): "#fd8d3c",
-        ("multi_deepfool", "weak_adv"): "#fdbe85",
+        # clean: blue tones
+        ("clean", "nat"): "#0000FF",          # blue
+        ("clean", "nat_and_adv"): "#00BFFF",  # deep sky blue
+        ("clean", "adv"): "#000080",          # navy
+        ("clean", "weak_adv"): "#87CEEB",     # sky blue
+        # random: green tones
+        ("random", "nat"): "#008000",         # green
+        ("random", "nat_and_adv"): "#00FF00", # lime
+        ("random", "adv"): "#006400",         # dark green
+        ("random", "weak_adv"): "#90EE90",    # light green
+        # deepfool: red/pink tones
+        ("deepfool", "nat"): "#FF0000",       # red
+        ("deepfool", "nat_and_adv"): "#FF69B4", # hot pink
+        ("deepfool", "adv"): "#8B0000",       # dark red
+        ("deepfool", "weak_adv"): "#FFC0CB",  # pink
+        # multi_deepfool: orange/yellow/brown tones
+        ("multi_deepfool", "nat"): "#FF8C00",     # dark orange
+        ("multi_deepfool", "nat_and_adv"): "#FFD700", # gold
+        ("multi_deepfool", "adv"): "#8B4513",     # saddle brown
+        ("multi_deepfool", "weak_adv"): "#FFFF00", # yellow
     }
     return colors.get((init, model), "gray")
+
+
+def get_linestyle_for_model(model: str) -> str:
+    """Get line style for each model to add extra distinction."""
+    styles = {
+        "nat": "-",
+        "nat_and_adv": "--",
+        "adv": "-.",
+        "weak_adv": ":",
+    }
+    return styles.get(model, "-")
 
 
 def plot_misclassification_cdf_overlay(
@@ -652,13 +664,14 @@ def plot_misclassification_cdf_overlay(
             color = get_color_for_init_model(init, model)
 
             if len(misclassified) == 0:
-                handle = ax.plot([], [], color=color, linewidth=2.0, label=label)[0]
+                handle = ax.plot([], [], color="lightgray", linewidth=1.0, linestyle="--")[0]
                 handles_labels.append((handle, label))
                 continue
 
             sorted_iters = np.sort(misclassified)
             cdf = np.arange(1, len(sorted_iters) + 1) / n_total
 
+            linestyle = get_linestyle_for_model(model)
             if n_total == 1:
                 handle = ax.scatter(
                     sorted_iters,
@@ -677,7 +690,8 @@ def plot_misclassification_cdf_overlay(
                     cdf,
                     where="post",
                     color=color,
-                    linewidth=2.0,
+                    linewidth=2.5,
+                    linestyle=linestyle,
                     alpha=0.9,
                 )[0]
             handles_labels.append((handle, label))
