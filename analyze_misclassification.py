@@ -648,7 +648,7 @@ def get_linestyle_for_model(model: str, dataset: str = "mnist") -> str:
         # CIFAR10: more distinct linestyles for narrow data range
         styles = {
             "nat": "-",
-            "nat_and_adv": (0, (5, 2)),  # dashed (longer)
+            "nat_and_adv": (0, (10, 3)),  # long dashed (very distinct)
             "adv": "-.",
             "weak_adv": (0, (1, 1)),  # dotted (dense)
         }
@@ -680,10 +680,13 @@ def plot_misclassification_cdf_overlay(
     zorders = {"nat": 14, "weak_adv": 13, "nat_and_adv": 12, "adv": 11}
     handles_labels = []
 
-    # CIFAR10: compute x-offsets to place overlapping lines/points side by side
+    # CIFAR10: compute per-iteration x-offsets (group tightly at each iteration value)
     if dataset == "cifar10":
-        # Count valid (non-failed) combinations first
-        valid_combinations = []
+        # First pass: collect all data and count occurrences per iteration
+        all_series_data = []
+        iter_to_series: Dict[int, List[int]] = {}  # iteration -> list of series indices
+
+        series_idx = 0
         for init in INIT_ORDER:
             if init not in stats_by_init:
                 continue
@@ -699,20 +702,30 @@ def plot_misclassification_cdf_overlay(
                 iters = np.array(model_iters)
                 misclassified = iters[iters >= 0]
                 if len(misclassified) > 0:
-                    valid_combinations.append((init, model))
+                    all_series_data.append((init, model, misclassified))
+                    # Track which iterations this series touches
+                    for it in np.unique(misclassified):
+                        it_int = int(it)
+                        if it_int not in iter_to_series:
+                            iter_to_series[it_int] = []
+                        iter_to_series[it_int].append(series_idx)
+                    series_idx += 1
 
-        n_valid = len(valid_combinations)
-        # Offsets: spread within -0.08 to +0.08 range (very tight, side by side)
-        if n_valid > 1:
-            offsets = {
-                combo: -0.08 + 0.16 * i / (n_valid - 1)
-                for i, combo in enumerate(valid_combinations)
-            }
-        else:
-            offsets = {combo: 0.0 for combo in valid_combinations}
+        # Compute offset for each (series, iteration) pair
+        # At each iteration, series are placed side by side
+        series_iter_offsets: Dict[Tuple[int, int], float] = {}
+        offset_width = 0.03  # spacing between adjacent items (tight but no overlap)
+        for it, series_list in iter_to_series.items():
+            n_at_iter = len(series_list)
+            for rank, s_idx in enumerate(series_list):
+                # Center the group around 0
+                offset = (rank - (n_at_iter - 1) / 2) * offset_width
+                series_iter_offsets[(s_idx, it)] = offset
     else:
-        offsets = {}
+        all_series_data = None
+        series_iter_offsets = {}
 
+    series_idx = 0
     for init in INIT_ORDER:
         if init not in stats_by_init:
             continue
@@ -734,12 +747,8 @@ def plot_misclassification_cdf_overlay(
 
             attack_rate = len(misclassified) / n_total * 100
             label = f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_failed})"
-            # CIFAR10: use distinct colors per init/model due to narrow data range
-            # MNIST: use same color for same init, distinguish by linestyle
-            if dataset == "cifar10":
-                color = get_color_for_init_model(init, model)
-            else:
-                color = get_color_for_init(init)
+            # Same color for same init (both MNIST and CIFAR10)
+            color = get_color_for_init(init)
             linestyle = get_linestyle_for_model(model, dataset)
             lw = linewidths.get(model, 2.0)
             ms = marker_sizes.get(model, 100)
@@ -753,10 +762,16 @@ def plot_misclassification_cdf_overlay(
             sorted_iters = np.sort(misclassified).astype(float)
             cdf = np.arange(1, len(sorted_iters) + 1) / n_total
 
-            # CIFAR10: apply x-offset to avoid overlap
-            if dataset == "cifar10" and (init, model) in offsets:
-                x_offset = offsets[(init, model)]
-                sorted_iters = sorted_iters + x_offset
+            # CIFAR10: apply per-iteration x-offset
+            if dataset == "cifar10":
+                offset_iters = np.zeros_like(sorted_iters)
+                for i, it in enumerate(sorted_iters):
+                    it_int = int(it)
+                    key = (series_idx, it_int)
+                    if key in series_iter_offsets:
+                        offset_iters[i] = series_iter_offsets[key]
+                sorted_iters = sorted_iters + offset_iters
+                series_idx += 1
 
             if n_total == 1:
                 handle = ax.scatter(
