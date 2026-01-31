@@ -587,6 +587,29 @@ def plot_misclassification_histogram(
     print(f"[SAVE] Misclassification histogram: {out_path}")
 
 
+def get_color_for_model_init(model: str, init: str) -> str:
+    """Get distinct color for each model/init combination."""
+    colors = {
+        ("nat", "clean"): "#1f77b4",
+        ("nat", "random"): "#2ca02c",
+        ("nat", "deepfool"): "#d62728",
+        ("nat", "multi_deepfool"): "#ff7f0e",
+        ("nat_and_adv", "clean"): "#17becf",
+        ("nat_and_adv", "random"): "#98df8a",
+        ("nat_and_adv", "deepfool"): "#ff9896",
+        ("nat_and_adv", "multi_deepfool"): "#ffbb78",
+        ("adv", "clean"): "#9467bd",
+        ("adv", "random"): "#8c564b",
+        ("adv", "deepfool"): "#e377c2",
+        ("adv", "multi_deepfool"): "#7f7f7f",
+        ("weak_adv", "clean"): "#bcbd22",
+        ("weak_adv", "random"): "#aec7e8",
+        ("weak_adv", "deepfool"): "#c49c94",
+        ("weak_adv", "multi_deepfool"): "#f7b6d2",
+    }
+    return colors.get((model, init), "gray")
+
+
 def plot_misclassification_cdf_overlay(
     stats_by_init: Dict[str, Dict[str, Dict[str, np.ndarray]]],
     out_path: str,
@@ -595,10 +618,7 @@ def plot_misclassification_cdf_overlay(
     """Plot CDF overlay comparing all inits on one figure."""
     fig, ax = plt.subplots(figsize=(12, 7))
 
-    linestyles = {"clean": "-", "random": "--", "deepfool": "-.", "multi_deepfool": ":"}
-    colors_model = {"nat": "C0", "nat_and_adv": "C1", "adv": "C2", "weak_adv": "C3"}
     markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
-    linewidths = {"nat": 2.5, "nat_and_adv": 2.0, "adv": 1.5, "weak_adv": 1.0}
 
     for init in INIT_ORDER:
         if init not in stats_by_init:
@@ -626,17 +646,20 @@ def plot_misclassification_cdf_overlay(
 
             attack_rate = len(misclassified) / n_total * 100
             label = f"{model}/{init} ({attack_rate:.0f}%)"
+            color = get_color_for_model_init(model, init)
 
             if n_total == 1:
                 ax.scatter(
                     sorted_iters,
                     cdf,
                     label=label,
-                    color=colors_model.get(model, "gray"),
+                    color=color,
                     marker=markers.get(model, "o"),
-                    s=80,
+                    s=100,
                     alpha=0.9,
                     zorder=10,
+                    edgecolors="black",
+                    linewidths=0.5,
                 )
             else:
                 ax.step(
@@ -644,10 +667,9 @@ def plot_misclassification_cdf_overlay(
                     cdf,
                     where="post",
                     label=label,
-                    color=colors_model.get(model, "gray"),
-                    linestyle=linestyles.get(init, "-"),
-                    linewidth=linewidths.get(model, 1.5),
-                    alpha=0.85,
+                    color=color,
+                    linewidth=2.0,
+                    alpha=0.9,
                 )
 
     ax.set_xlabel("Iteration")
@@ -661,6 +683,98 @@ def plot_misclassification_cdf_overlay(
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"[SAVE] Misclassification CDF overlay: {out_path}")
+
+
+def plot_misclassification_histogram_overlay(
+    stats_by_init: Dict[str, Dict[str, Dict[str, np.ndarray]]],
+    out_path: str,
+    dataset: str,
+) -> None:
+    """Plot histogram overlay comparing all model/init combinations."""
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    all_data = []
+    for init in INIT_ORDER:
+        if init not in stats_by_init:
+            continue
+        stats = stats_by_init[init]
+        for model in MODEL_ORDER:
+            if model not in stats:
+                continue
+            model_iters = []
+            for init_key in stats[model]:
+                model_iters.extend(stats[model][init_key].tolist())
+            if model_iters:
+                all_data.append((model, init, np.array(model_iters)))
+
+    if not all_data:
+        print("[WARN] No data for histogram overlay")
+        return
+
+    all_misclassified = []
+    for _, _, iters in all_data:
+        misclassified = iters[iters >= 0]
+        all_misclassified.extend(misclassified.tolist())
+
+    if all_misclassified:
+        max_iter = int(np.max(all_misclassified))
+    else:
+        max_iter = 100
+
+    bin_edges = list(range(max_iter + 2))
+    n_bins = len(bin_edges) - 1
+    n_groups = len(all_data)
+    bar_width = 0.8 / n_groups
+
+    for idx, (model, init, iters) in enumerate(all_data):
+        misclassified_iters = iters[iters >= 0]
+        n_not_count = int(np.sum(iters == NOT_MISCLASSIFIED))
+        n_total = len(iters)
+
+        counts, _ = np.histogram(misclassified_iters, bins=bin_edges)
+        color = get_color_for_model_init(model, init)
+
+        x_positions = np.arange(n_bins) + idx * bar_width - (n_groups - 1) * bar_width / 2
+        ax.bar(
+            x_positions,
+            counts,
+            width=bar_width,
+            color=color,
+            alpha=0.85,
+            label=f"{model}/{init} (n={n_total}, fail={n_not_count})",
+        )
+
+        fail_x = n_bins + 1 + idx * bar_width - (n_groups - 1) * bar_width / 2
+        ax.bar(
+            fail_x, n_not_count, width=bar_width, color=color,
+            alpha=0.85, hatch="//",
+        )
+
+    if max_iter <= 20:
+        step = 5
+    elif max_iter <= 50:
+        step = 10
+    else:
+        step = 20
+    x_tick_positions = list(range(0, n_bins + 1, step))
+    if n_bins not in x_tick_positions:
+        x_tick_positions.append(n_bins)
+    x_tick_positions.append(n_bins + 1)
+    x_tick_labels = [str(i) for i in x_tick_positions[:-1]] + ["FAIL"]
+    ax.set_xticks(x_tick_positions)
+    ax.set_xticklabels(x_tick_labels)
+
+    ax.set_xlabel("First Misclassification Iteration (FAIL = attack failed)")
+    ax.set_ylabel("Count")
+    ax.set_title(f"First Misclassification Distribution ({dataset.upper()}, all inits, single sample)")
+    ax.legend(loc="upper right", fontsize=6, ncol=2)
+    ax.set_xlim(-0.5, n_bins + 2.5)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] Misclassification histogram overlay: {out_path}")
 
 
 def main() -> None:
@@ -754,6 +868,11 @@ def main() -> None:
             plot_misclassification_cdf_overlay(
                 stats_by_dataset_init[dataset],
                 os.path.join(dataset_dir, "misclassification_cdf_overlay.png"),
+                dataset,
+            )
+            plot_misclassification_histogram_overlay(
+                stats_by_dataset_init[dataset],
+                os.path.join(dataset_dir, "misclassification_histogram_overlay.png"),
                 dataset,
             )
 

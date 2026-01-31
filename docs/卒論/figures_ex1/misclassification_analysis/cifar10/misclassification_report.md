@@ -14,15 +14,19 @@
 
 | Model | Init | Attack Rate | Mean | Median | P95 | Max | N | Failed |
 |-------|------|------------:|-----:|-------:|----:|----:|--:|-------:|
+| nat | clean | 100%(1/1) | 1.0 | 1.0 | 1.0 | 1 | 1 | 0%(0) |
 | nat | random | 100%(20/20) | 1.3 | 1.0 | 2.0 | 2 | 20 | 0%(0) |
 | nat | deepfool | 100%(1/1) | 0.0 | 0.0 | 0.0 | 0 | 1 | 0%(0) |
 | nat | multi_deepfool | 100%(9/9) | 0.3 | 0.0 | 1.0 | 1 | 9 | 0%(0) |
+| nat_and_adv | clean | 100%(1/1) | 1.0 | 1.0 | 1.0 | 1 | 1 | 0%(0) |
 | nat_and_adv | random | 100%(20/20) | 1.0 | 1.0 | 1.0 | 1 | 20 | 0%(0) |
 | nat_and_adv | deepfool | 100%(1/1) | 0.0 | 0.0 | 0.0 | 0 | 1 | 0%(0) |
 | nat_and_adv | multi_deepfool | 100%(9/9) | 0.0 | 0.0 | 0.0 | 0 | 9 | 0%(0) |
+| adv | clean | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | adv | random | 0%(0/20) | N/A | N/A | N/A | N/A | 20 | 100%(20) |
 | adv | deepfool | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | adv | multi_deepfool | 0%(0/9) | N/A | N/A | N/A | N/A | 9 | 100%(9) |
+| weak_adv | clean | 100%(1/1) | 2.0 | 2.0 | 2.0 | 2 | 1 | 0%(0) |
 | weak_adv | random | 100%(20/20) | 2.0 | 2.0 | 2.0 | 2 | 20 | 0%(0) |
 | weak_adv | deepfool | 100%(1/1) | 1.0 | 1.0 | 1.0 | 1 | 1 | 0%(0) |
 | weak_adv | multi_deepfool | 100%(9/9) | 0.1 | 0.0 | 0.6 | 1 | 9 | 0%(0) |
@@ -40,10 +44,10 @@
 
 | Metric | Value |
 |--------|------:|
-| Attack Success Rate | 75%(90/120) |
-| Total samples | 120 |
-| Misclassified | 90 |
-| Failed (never misclassified) | 25%(30) |
+| Attack Success Rate | 75%(93/124) |
+| Total samples | 124 |
+| Misclassified | 93 |
+| Failed (never misclassified) | 25%(31) |
 | Mean iteration | 1.0 |
 | Median iteration | 1.0 |
 | P95 iteration | 2.0 |

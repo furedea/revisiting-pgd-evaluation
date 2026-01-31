@@ -14,15 +14,19 @@
 
 | Model | Init | Attack Rate | Mean | Median | P95 | Max | N | Failed |
 |-------|------|------------:|-----:|-------:|----:|----:|--:|-------:|
+| nat | clean | 100%(1/1) | 12.0 | 12.0 | 12.0 | 12 | 1 | 0%(0) |
 | nat | random | 100%(20/20) | 6.6 | 7.0 | 8.0 | 8 | 20 | 0%(0) |
 | nat | deepfool | 100%(1/1) | 0.0 | 0.0 | 0.0 | 0 | 1 | 0%(0) |
 | nat | multi_deepfool | 100%(9/9) | 0.7 | 1.0 | 1.0 | 1 | 9 | 0%(0) |
+| nat_and_adv | clean | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | nat_and_adv | random | 0%(0/20) | N/A | N/A | N/A | N/A | 20 | 100%(20) |
 | nat_and_adv | deepfool | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | nat_and_adv | multi_deepfool | 0%(0/9) | N/A | N/A | N/A | N/A | 9 | 100%(9) |
+| adv | clean | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | adv | random | 0%(0/20) | N/A | N/A | N/A | N/A | 20 | 100%(20) |
 | adv | deepfool | 0%(0/1) | N/A | N/A | N/A | N/A | 1 | 100%(1) |
 | adv | multi_deepfool | 0%(0/9) | N/A | N/A | N/A | N/A | 9 | 100%(9) |
+| weak_adv | clean | 100%(1/1) | 35.0 | 35.0 | 35.0 | 35 | 1 | 0%(0) |
 | weak_adv | random | 100%(20/20) | 25.5 | 25.0 | 29.1 | 30 | 20 | 0%(0) |
 | weak_adv | deepfool | 100%(1/1) | 22.0 | 22.0 | 22.0 | 22 | 1 | 0%(0) |
 | weak_adv | multi_deepfool | 100%(9/9) | 28.1 | 28.0 | 33.0 | 35 | 9 | 0%(0) |
@@ -40,17 +44,17 @@
 
 | Metric | Value |
 |--------|------:|
-| Attack Success Rate | 50%(60/120) |
-| Total samples | 120 |
-| Misclassified | 60 |
-| Failed (never misclassified) | 50%(60) |
-| Mean iteration | 15.4 |
-| Median iteration | 15.0 |
+| Attack Success Rate | 50%(62/124) |
+| Total samples | 124 |
+| Misclassified | 62 |
+| Failed (never misclassified) | 50%(62) |
+| Mean iteration | 15.6 |
+| Median iteration | 17.0 |
 | P95 iteration | 30.0 |
 | Max iteration | 35 |
 
 ## Key Findings
 
-- **50% of successful attacks** achieve misclassification by iteration **15**
+- **50% of successful attacks** achieve misclassification by iteration **17**
 - **90% of successful attacks** achieve misclassification by iteration **29**
 - **95% of successful attacks** achieve misclassification by iteration **30**
