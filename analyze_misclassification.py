@@ -702,10 +702,10 @@ def plot_misclassification_cdf_overlay(
                     valid_combinations.append((init, model))
 
         n_valid = len(valid_combinations)
-        # Offsets: spread within -0.25 to +0.25 range (tight grouping)
+        # Offsets: spread within -0.08 to +0.08 range (very tight, side by side)
         if n_valid > 1:
             offsets = {
-                combo: -0.25 + 0.5 * i / (n_valid - 1)
+                combo: -0.08 + 0.16 * i / (n_valid - 1)
                 for i, combo in enumerate(valid_combinations)
             }
         else:
