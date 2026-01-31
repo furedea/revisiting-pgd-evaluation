@@ -1,31 +1,24 @@
 \chapter{評価実験}
 \label{chapter:experiment}
-本章では，Madryらの実験の再現及び提案手法であるDeepFool初期化の評価実験について述べる．
+本章では，第\ref{chapter:experiment_design}章で定義した評価指標を用いて，各データセットやモデル，初期化手法によるPGD攻撃の収束特性を実験的に検証する．なお，本章ではnatモデルとadvモデルに焦点を当てて分析を行う．
 
 \section{実験設定}
 \label{sec:experiment_setting}
 
-\subsection{使用モデル}
-Madryらが公開しているリポジトリ\cite{MadryMNIST, MadryCIFAR10}から入手した事前学習済みモデルを使用する．表\ref{table:models_detail}に各モデルの詳細を示す．
+\subsection{データセットとモデル}
+データセットはMNISTとCIFAR10を使用する．モデルは，クリーンデータのみで訓練したnat，PGD敵対的サンプルのみで訓練したadvの2種類を主に使用する．各データセット・モデルの詳細は第\ref{sec:experiment_target}節を参照されたい．
 
-\begin{table}[hbtp]
-  \caption{使用モデルの詳細}
-  \label{table:models_detail}
-  \centering
-  \begin{tabular}{l|l|cc}
-    \hline
-    モデル名 & 訓練方法 & MNIST & CIFAR10 \\
-    \hline
-    nat & 自然学習 & \checkmark & \checkmark \\
-    adv & 敵対的学習 & \checkmark & \checkmark \\
-    nat\_and\_adv & 混合学習 & \checkmark & - \\
-    weak\_adv & 弱敵対的学習 & \checkmark & - \\
-    \hline
-  \end{tabular}
-\end{table}
+\subsection{初期化手法}
+PGD攻撃の初期化手法として，以下の3種類を比較する：
+\begin{itemize}
+    \item ランダム初期化：$\ell_\infty$制約範囲内の一様乱数を初期点とする
+    \item DeepFool初期化：DeepFoolで生成した敵対的サンプルを初期点とする
+    \item Multi-DeepFool初期化：各ターゲットラベルへのDeepFool結果を初期点とする
+\end{itemize}
+ランダム初期化の詳細は第\ref{sec:init_methods}節，DeepFool初期化とMulti-DeepFool初期化の詳細は第\ref{chapter:proposed}章を参照されたい．
 
 \subsection{攻撃パラメータ}
-表\ref{table:attack_params}にPGD攻撃のパラメータを示す．これらのパラメータはMadryらの論文\cite{PGD}と同一の設定である．
+表\ref{table:attack_params}にPGD攻撃のパラメータを示す．これらのパラメータはMadryらの論文\cite{PGD}と同一の設定である．DeepFoolのパラメータは，最大反復回数$T_{\text{df}} = 50$，オーバーシュート係数$\eta = 0.02$とする．
 
 \begin{table}[hbtp]
   \caption{PGD攻撃のパラメータ設定}
@@ -38,24 +31,42 @@ Madryらが公開しているリポジトリ\cite{MadryMNIST, MadryCIFAR10}か�
     摂動制約$\varepsilon$ & $0.3$ & $8/255 \approx 0.031$ \\
     ステップサイズ$\alpha$ & $0.01$ & $2/255 \approx 0.008$ \\
     反復数$T$ & $100$ & $100$ \\
-    リスタート数 & $9$ & $9$ \\
     \hline
   \end{tabular}
 \end{table}
 
-\subsection{初期化手法}
-本実験では，以下の3種類の初期化手法を比較する：
-\begin{itemize}
-    \item \textbf{Random}：$\ell_\infty$制約範囲内での一様乱数による初期化
-    \item \textbf{DeepFool}：DeepFoolによる敵対的サンプルを初期点とする手法
-    \item \textbf{Multi-DeepFool}：複数ターゲットへのDeepFoolの中から最大損失の点を選択する手法
-\end{itemize}
+\subsection{リスタート数}
+表\ref{table:restart_per_init}に初期化手法ごとのリスタート数を示す．決定的な初期化手法（DeepFool）はリスタート数1，確率的なランダム初期化は20回のリスタートを行う．Multi-DeepFool初期化は9つのターゲットクラスに対して独立にPGD攻撃を実行するため，リスタート数を9として扱う．
 
-DeepFoolのパラメータは，最大反復回数$T_{\text{df}} = 50$，オーバーシュート係数$\eta = 0.02$とする．
+\begin{table}[hbtp]
+  \caption{初期化手法ごとのリスタート数}
+  \label{table:restart_per_init}
+  \centering
+  \begin{tabular}{l|c|l}
+    \hline
+    初期化手法 & リスタート数 & 性質 \\
+    \hline
+    ランダム & 20 & 確率的 \\
+    DeepFool & 1 & 決定的 \\
+    Multi-DeepFool & 9 & 決定的 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{評価用サンプルの選択}
+\label{sec:sample_selection}
+実験に使用するテストサンプルは，各データセットのテストデータから以下の基準で選択した：
+\begin{enumerate}
+    \item テストデータを先頭から順に走査
+    \item 対象モデルが自然画像の状態で正しく分類するサンプルを抽出
+    \item 最初に見つかった5枚（または1枚）を評価用サンプルとして使用
+\end{enumerate}
+この選択基準は，PGD攻撃の前提条件である「元々正しく分類されているサンプルに対する攻撃」を満たすためである．攻撃前から誤分類されているサンプルを評価対象に含めると，攻撃の効果を正しく評価できない．
+
+テストデータの取得にはTensorFlowの標準データローダーを使用した．MNISTはTensorFlow 1.x系に付属するMNISTデータローダー，CIFAR10はKerasのデータセットAPIからそれぞれ取得した．これらのローダーが返すテストデータの順序は固定されており，再現性が保証される．
 
 \subsection{実行環境}
-% TODO: 実行環境の詳細を記載
-実験はPython 3.xおよびPyTorchを用いて実施した．
+実験はPython 3.6.9およびTensorFlow 1.15.5を用いて実施した．Madryらが公開しているモデルおよび学習コードはTensorFlow 1.x系で実装されており，これらを正常に動作させるために環境を合わせた．
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{ランダム初期化PGDの収束解析}
@@ -63,118 +74,195 @@ DeepFoolのパラメータは，最大反復回数$T_{\text{df}} = 50$，オー�
 
 本節では，ランダム初期化PGD攻撃の収束挙動を分析する．これはMadryらの実験の再現及び定量的拡張に相当する．
 
-\subsection{MNISTでの結果}
-\label{sec:random_mnist}
+\subsection{損失曲線の観察}
+\label{sec:random_loss_curves}
 
-図\ref{fig:mnist_random_loss_curves}に，MNISTの各モデルに対するランダム初期化PGD攻撃の損失曲線を示す．各図は1つのサンプルに対する複数リスタートの損失推移を表しており，下部のヒートマップは各リスタートにおける予測の正誤を示す．
+本節では，Madryらの実験の再現として，natモデルとadvモデルに対する損失曲線を可視化する．全モデル（nat, adv, nat\_and\_adv, weak\_adv）について同様の図を示すと膨大な量となるため，本節ではMadryらが主に分析対象としたnat, advの2モデルに絞って結果を示す．他のモデルを含めた定量的な比較は次節で行う．
 
-% TODO: 図を挿入（figures/run_all/mnist_*_random_*.png）
+本節の図は行ごとに全て以下の3段構成となっている．また各列は，節\ref{sec:sample_selection}に基づき選択された，異なる5つのテストサンプルに対応している．
+
+\paragraph{損失曲線（上段）}
+縦軸は交差エントロピー損失（Cross-entropy Loss），横軸はPGD攻撃の反復回数（Iterations）を表す．反復0は初期状態（ランダム初期化直後）に対応する．20本の曲線はそれぞれ異なるランダム初期点から開始した各リスタートの損失推移を示す．曲線が上昇するほど攻撃が成功（モデルの予測確信度が低下）していることを意味する．
+
+\paragraph{正誤ヒートマップ（中段）}
+縦軸はリスタート番号（0〜19），横軸は反復回数を表す．各セルの色は，その時点での敵対的サンプルに対するモデルの予測結果を示す．黄色は正しく分類（攻撃失敗），紫色は誤分類（攻撃成功）を意味する．このヒートマップにより，各リスタートがいつ攻撃に成功したかを視覚的に確認できる．
+
+\paragraph{画像比較（下段）}
+左側の\texttt{x\_nat}は元の自然画像（摂動を加える前の入力），右側の\texttt{x\_adv}は最終的な敵対的サンプルを示す．\texttt{x\_adv}は，最終時点で攻撃成功（誤分類）したリスタートがあればその中でインデックスが最小のもの，全リスタートで攻撃失敗の場合は最終損失が最大のリスタートの結果を表示している．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_random}にMNIST natモデルに対するランダム初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_random_sample.png}
-  \caption{MNIST natモデルに対するランダム初期化PGDの損失曲線（図は実験完了後に挿入）}
+  \includegraphics[width=\linewidth]{figure/mnist_nat_random_indices0-1-2-3-4_k100_eps0.3_a0.01_r20_seed0.png}
+  \caption{MNIST natモデルに対するランダム初期化PGDの損失の推移と誤分類の様子}
   \label{fig:mnist_nat_random}
 \end{figure}
 
+\medskip
+図\ref{fig:mnist_nat_random}より，以下の観察が得られる．20回のリスタートは異なるランダム初期点から開始しているが，いずれも同程度のプラトーに収束している．これはMadryらの「異なる初期点から同程度の局所最大解に収束する」という観察と一致する．損失曲線を詳細に見ると，初期の数反復で急速に損失が上昇し，その後は緩やかな上昇に転じている．この2段階の収束パターンは，PGD攻撃が最初に大域的な勾配方向に沿って移動し，その後局所的な最適化を行っていることを示唆している．
+
+ヒートマップを見ると，多くのリスタートが5~15反復程度で攻撃成功（紫色）に至っており，初期点によらず安定した攻撃が行われていることがわかる．サンプル間で攻撃成功までの反復数に若干の差があるが，これは各サンプルの決定境界までの距離の違いを反映していると考えられる．
+
+\subsubsection{MNIST advモデル}
+
+図\ref{fig:mnist_adv_random}にMNIST advモデルに対するランダム初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_adv_random_sample.png}
-  \caption{MNIST advモデルに対するランダム初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/mnist_adv_random_indices0-1-2-3-4_k100_eps0.3_a0.01_r20_seed0.png}
+  \caption{MNIST advモデルに対するランダム初期化PGDの損失の推移と誤分類の様子}
   \label{fig:mnist_adv_random}
 \end{figure}
 
-\begin{figure}[htbp]
-  \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_and_adv_random_sample.png}
-  \caption{MNIST nat\_and\_advモデルに対するランダム初期化PGDの損失曲線}
-  \label{fig:mnist_nat_and_adv_random}
-\end{figure}
+\medskip
+図\ref{fig:mnist_adv_random}より，advモデルはnatモデルと比較して損失の上昇が極めて小さいことがわかる．これはPGD敵対的訓練によりモデルが頑健化され，損失関数の勾配が小さくなっているためと考えられる．natモデルでは初期の数反復で急激な損失上昇が見られたのに対し，advモデルではより緩やかな上昇にとどまり，収束せずに振動するリスタートも存在する．またリスタート毎に損失曲線の形状が大きく異なる．これはグラフの縦軸がnatモデルと比較して非常に狭い範囲に収まっていることから差が顕著に見えるからだと考えられる．
+
+ヒートマップを見ると，どのサンプルも100反復以内に攻撃成功に至っておらず，多くのリスタートが最後まで正しく分類（黄色）されている．
+
+\subsubsection{CIFAR10 natモデル}
+
+図\ref{fig:cifar10_nat_random}にCIFAR10 natモデルに対するランダム初期化PGDの結果を示す．
 
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_weak_adv_random_sample.png}
-  \caption{MNIST weak\_advモデルに対するランダム初期化PGDの損失曲線}
-  \label{fig:mnist_weak_adv_random}
-\end{figure}
-
-表\ref{table:mnist_random_convergence}に，MNISTの各モデルにおける収束統計量を示す．
-
-\begin{table}[hbtp]
-  \caption{MNISTランダム初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:mnist_random_convergence}
-  \centering
-  \begin{tabular}{l|cccc}
-    \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
-    nat\_and\_adv & - & - & - & - \\
-    weak\_adv & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{CIFAR10での結果}
-\label{sec:random_cifar10}
-
-図\ref{fig:cifar10_random_loss_curves}に，CIFAR10の各モデルに対するランダム初期化PGD攻撃の損失曲線を示す．
-
-% TODO: 図を挿入（figures/run_all/cifar10_*_random_*.png）
-\begin{figure}[htbp]
-  \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_random_sample.png}
-  \caption{CIFAR10 natモデルに対するランダム初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_random_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r20_seed0.png}
+  \caption{CIFAR10 natモデルに対するランダム初期化PGDの損失の推移と誤分類の様子}
   \label{fig:cifar10_nat_random}
 \end{figure}
 
+\medskip
+図\ref{fig:cifar10_nat_random}より，CIFAR10ではMNISTと比較して収束が非常に高速であることがわかる．多くのリスタートが5反復ほどで攻撃成功に至っており，損失曲線も数反復で急速にプラトーに到達している．
+
+この高速収束の要因として，CIFAR10の入力次元（$32 \times 32 \times 3 = 3072$次元）がMNIST（$28 \times 28 \times 1 = 784$次元）より高いことが考えられる．高次元空間では勾配上昇の方向の自由度が高く，効率的に損失を増加させる方向を見つけやすい．
+
+ヒートマップでは，ほぼ全てのセルが早い段階で紫色に変わっており，CIFAR10 natモデルがPGD攻撃に対して非常に脆弱であることを示している．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_random}にCIFAR10 advモデルに対するランダム初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_adv_random_sample.png}
-  \caption{CIFAR10 advモデルに対するランダム初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_random_indices1-2-3-4-5_k100_eps0.03137254901960784_a0.00784313725490196_r20_seed0.png}
+  \caption{CIFAR10 advモデルに対するランダム初期化PGDの損失の推移と誤分類の様子}
   \label{fig:cifar10_adv_random}
 \end{figure}
 
-表\ref{table:cifar10_random_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+\medskip
+図\ref{fig:cifar10_adv_random}より，いくつかのサンプルでは，敵対的訓練されたモデルに対しても，CIFAR10では比較的速く収束していることがわかる．natモデルと比較すると収束は若干遅いが，MNISTのadvモデルほどの差は見られない．しかし他方のサンプルではMNIST advモデル同様に損失がほとんど上昇せず，攻撃に成功しない場合も存在する．
+
+CIFAR10のadvモデルがMNISTのadvモデルより高速に収束する理由として，前述の入力次元の違いに加え，CIFAR10の画像がより複雑であり，敵対的訓練によっても損失関数の形状を十分に平滑化できていない可能性が考えられる．
+
+\subsection{収束特性の定量分析}
+\label{sec:random_convergence}
+
+本節では，収束反復数の累積分布関数（CDF）および平均正規化損失曲線を用いて，収束特性を定量的に分析する．前節では可視化の都合上nat, advの2モデルのみを示したが，本節ではnat\_and\_advおよびweak\_advを含む全4モデルの結果を比較する．CDFおよび平均損失曲線の形式であれば，複数モデルを同一グラフ上で比較できるためである．これらの図は，節\ref{sec:sample_selection}に基づき選択された1つのテストサンプルを固定した条件での収束特性を示している．
+
+\paragraph{収束CDFの読み方}
+累積分布関数（CDF）は，各モデルについて「反復数$t$までに収束したサンプルの割合」を示す．縦軸は累積収束割合（0〜1），横軸は反復回数である．曲線が左側にあるほど高速に収束していることを意味する．凡例には各モデルのサンプル数（n），収束率（\%），未到達数（NR），不安定数（US）が表示されている．収束の判定基準（90\%閾値と安定性条件）およびNR・USの定義については第\ref{sec:convergence_threshold}節および第\ref{sec:non_convergence_types}節を参照されたい．
+
+\paragraph{平均正規化損失曲線の読み方}
+平均正規化損失曲線は，各モデルについて全リスタートの正規化損失進捗率（式(\ref{eq:normalized_loss_progress_ratio})）の平均値を示す．縦軸の正規化損失進捗率は0が初期状態，1が最大損失到達を意味する．赤い点線は収束閾値（90\%）を示す．塗りつぶし領域は平均±1標準偏差の範囲を示し，サンプル間のばらつきを表す．
+
+\subsubsection{MNIST}
+
+図\ref{fig:random_cdf_mnist}にMNISTにおけるランダム初期化の収束反復数CDFを示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/mnist_random_convergence_cdf.png}
+  \caption{MNISTにおけるランダム初期化の収束反復数CDF．横軸は反復回数，縦軸は累積収束割合．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:random_cdf_mnist}
+\end{figure}
+
+\medskip
+図\ref{fig:random_cdf_mnist}より，nat, advモデルとも100\%の収束率を達成していることがわかる．natモデルの曲線はadvモデルより左側に位置しており，より高速に収束していることを示している．natモデルでは60反復までに全てのリスタートが収束しているのに対し，advモデルでは90反復まで要している．
+
+nat\_and\_advおよびweak\_advモデルについては，natやadvとは異なる傾向が見られる．weak\_advは最も収束が遅く，最低でも65反復ほどを経ないと収束していない．nat\_and\_advはadvモデルでよりも収束が僅かに遅く，1つのリスタートが不安定（US）となっている．
+
+\medskip
+図\ref{fig:random_mean_loss_mnist}にMNISTにおけるランダム初期化の平均正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/mnist_random_mean_loss_overlay.png}
+  \caption{MNISTにおけるランダム初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．塗りつぶし領域は平均±1標準偏差の範囲．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:random_mean_loss_mnist}
+\end{figure}
+
+\medskip
+図\ref{fig:random_mean_loss_mnist}より，natモデルとadvモデルの収束速度の違いが明確に確認できる．natモデルは約50反復で閾値（90\%）に到達しているのに対し，advモデルは約65反復を要している．また，advモデルの方が標準偏差（塗りつぶし領域の幅）が大きく，リスタート間での収束速度のばらつきが大きいことがわかる．
+
+nat\_and\_advモデルはadvモデルとほぼ同等の収束速度を示している上，標準偏差は小さい．一方weak\_advモデルでは，初期の約20反復では損失がほとんど上昇せず，その後急激に上昇し始める．これは，このモデルでは初期点付近の損失関数が平坦であり，一定の反復数を経て勾配が有効に働く領域に到達することを示唆している．最終的にweak\_advは約75反復で閾値に到達し，4モデル中最も遅い収束を示している．
+
+\subsubsection{CIFAR10}
+
+図\ref{fig:random_cdf_cifar10}にCIFAR10におけるランダム初期化の収束反復数CDFを示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/cifar10_random_convergence_cdf.png}
+  \caption{CIFAR10におけるランダム初期化の収束反復数CDF．横軸は反復回数，縦軸は累積収束割合．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:random_cdf_cifar10}
+\end{figure}
+
+\medskip
+図\ref{fig:random_cdf_cifar10}より，CIFAR10ではMNISTと比較して全モデルで高速に収束していることがわかる．興味深いことに，MNISTとは異なり，nat\_and\_adv，weak\_adv，advの3モデルがnatモデルより高速に収束している．これら3モデルは約5〜10反復で100\%収束を達成しているのに対し，natモデルは約22反復を要している．
+
+この傾向はMNISTとは逆であり，CIFAR10では敵対的訓練を含むモデルの方が攻撃に対して高速に収束する，すなわち損失が上昇しやすいことを示している．
+
+\medskip
+図\ref{fig:random_mean_loss_cifar10}にCIFAR10におけるランダム初期化の平均正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/cifar10_random_mean_loss_overlay.png}
+  \caption{CIFAR10におけるランダム初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．塗りつぶし領域は平均±1標準偏差の範囲．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:random_mean_loss_cifar10}
+\end{figure}
+
+\medskip
+図\ref{fig:random_mean_loss_cifar10}も図\ref{fig:random_cdf_cifar10}と同様に，CIFAR10ではMNISTと比較し損失が早い段階で急減に上昇していることを示している．nat\_and\_adv，weak\_adv，advの3モデルは約10反復で閾値に到達しており，ほぼ同等の収束速度を示している．一方，natモデルはこれらより遅く，約15反復で閾値に到達している．
+
+全モデルで標準偏差が非常に小さく，リスタート間での収束挙動のばらつきが少ない．これはCIFAR10の高次元性により，勾配方向の自由度が高く，初期点によらず効率的に損失を増加させられることを示唆している．MNISTで見られたweak\_advモデルの初期反復での損失の停滞はCIFAR10では観察されず，全モデルが初期から滑らかに上昇している．
+
+\subsubsection{統計量の比較}
+
+表\ref{table:random_convergence}に，ランダム初期化PGD攻撃の収束統計量を示す．
 
 \begin{table}[hbtp]
-  \caption{CIFAR10ランダム初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:cifar10_random_convergence}
+  \caption{ランダム初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:random_convergence}
   \centering
-  \begin{tabular}{l|cccc}
+  \begin{tabular}{l|l|ccccc}
     \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    & & & \multicolumn{3}{c}{収束反復数} & \\
+    \cline{4-6}
+    データセット & モデル & 収束率 & 平均 & 中央値 & P95 & 備考 \\
     \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
+    \multirow{4}{*}{MNIST} & nat & 100\% & 48.5 & 47.5 & 55.1 & \\
+    & nat\_and\_adv & 95\% & 60.7 & 60.0 & 76.5 & US:1 \\
+    & weak\_adv & 100\% & 73.2 & 71.0 & 85.0 & \\
+    & adv & 100\% & 54.0 & 50.0 & 84.2 & \\
+    \hline
+    \multirow{4}{*}{CIFAR10} & nat & 100\% & 14.3 & 13.0 & 22.0 & \\
+    & nat\_and\_adv & 100\% & 7.0 & 7.0 & 7.0 & \\
+    & weak\_adv & 100\% & 7.7 & 8.0 & 8.0 & \\
+    & adv & 100\% & 9.7 & 10.0 & 10.0 & \\
     \hline
   \end{tabular}
 \end{table}
 
-\subsection{データセット・モデル間比較}
-\label{sec:random_comparison}
+表\ref{table:random_convergence}より，データセット間およびモデル間での収束特性の違いを定量的に確認できる．
 
-図\ref{fig:random_mean_loss_overlay}に，各モデルの平均正規化損失曲線を示す．この図により，モデル間での収束速度の違いを比較できる．
+MNISTでは，モデルによって収束速度に大きな差がある．natモデルが最も高速（平均48.5反復）で，次いでadvモデル（54.0反復），nat\_and\_advモデル（60.7反復），weak\_advモデル（73.2反復）の順である．weak\_advモデルは4モデル中で最も遅く，P95では85反復を要している．これは，弱い敵対的訓練により損失関数の形状が平坦化され，PGD攻撃の初期段階で勾配が小さくなる傾向があることを反映している．nat\_and\_advモデルでは収束率が95\%であり，1件のUS（第\ref{sec:non_convergence_types}節参照）が発生している．
 
-% TODO: 図を挿入（convergence_analysis/threshold_0_90/*/random/mean_loss_overlay.png）
-\begin{figure}[htbp]
-  \centering
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_random_mean_loss.png}
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_random_mean_loss.png}
-  \caption{ランダム初期化PGDの平均正規化損失曲線（左：MNIST，右：CIFAR10）}
-  \label{fig:random_mean_loss_overlay}
-\end{figure}
+CIFAR10では，MNISTとは異なる傾向が見られる．nat\_and\_advモデル（平均7.0反復）とweak\_advモデル（7.7反復）が最も高速で，advモデル（9.7反復）がこれに続き，natモデル（14.3反復）が最も遅い．敵対的訓練を含むモデルがnatモデルより高速に収束するこの傾向は，CIFAR10の高次元性により，敵対的訓練によって生じた損失関数の変化が攻撃の効率を阻害しないことを示唆している．
 
-図\ref{fig:random_convergence_cdf}に，収束反復数の累積分布関数（CDF）を示す．
-
-% TODO: 図を挿入（convergence_analysis/threshold_0_90/*/random/convergence_cdf.png）
-\begin{figure}[htbp]
-  \centering
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_random_cdf.png}
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_random_cdf.png}
-  \caption{ランダム初期化PGDの収束反復数CDF（左：MNIST，右：CIFAR10）}
-  \label{fig:random_convergence_cdf}
-\end{figure}
+CIFAR10がMNISTより高速に収束する主な要因として，入力次元の違い（CIFAR10: 3072次元，MNIST: 784次元）による勾配方向の自由度の差が考えられる．高次元空間では，損失を増加させる方向がより多く存在するため，効率的な攻撃が可能となる．
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{DeepFool初期化の収束解析}
@@ -182,194 +270,342 @@ DeepFoolのパラメータは，最大反復回数$T_{\text{df}} = 50$，オー�
 
 本節では，DeepFool初期化PGD攻撃の収束挙動を分析し，ランダム初期化との比較を行う．
 
-\subsection{MNISTでの結果}
-\label{sec:deepfool_mnist}
+\subsection{損失曲線の観察}
+\label{sec:deepfool_loss_curves}
 
-図\ref{fig:mnist_deepfool_loss_curves}に，MNISTの各モデルに対するDeepFool初期化PGD攻撃の損失曲線を示す．
+本節の図はランダム初期化（第\ref{sec:random_loss_curves}節）と同様の3段構成であるが，以下の点が異なる．DeepFool初期化は決定的であるため，リスタート数は1であり，各パネルには1本の曲線のみが表示される．
 
-% TODO: 図を挿入（figures/run_all/mnist_*_deepfool_*.png）
+\paragraph{損失曲線（上段）}
+1本の曲線がDeepFool初期点からのPGD攻撃の損失推移を示す．反復0はDeepFoolによる初期化直後の状態に対応し，ランダム初期化と比較して初期損失が高い（決定境界付近から開始している）ことが特徴である．
+
+\paragraph{画像比較（下段）}
+3枚の画像が表示される：\texttt{x\_nat}（元の自然画像），\texttt{x\_df}（DeepFool終了時点の画像，PGD攻撃の初期点），\texttt{x\_adv}（PGD攻撃終了後の最終敵対的サンプル）．\texttt{x\_df}はDeepFoolにより決定境界付近に移動した画像であり，$\ell_\infty$制約内にクリップされている．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_deepfool}にMNIST natモデルに対するDeepFool初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_deepfool_sample.png}
-  \caption{MNIST natモデルに対するDeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/mnist_nat_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
+  \caption{MNIST natモデルに対するDeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対するDeepFool初期点からのPGD攻撃の結果を示す．}
   \label{fig:mnist_nat_deepfool}
 \end{figure}
 
+\medskip
+図\ref{fig:mnist_nat_deepfool}より，DeepFool初期化の効果が明確に確認できる．ランダム初期化（図\ref{fig:mnist_nat_random}）と比較すると，初期損失（反復0）が顕著に高く，既に決定境界付近から攻撃を開始していることがわかる．
+
+ランダム初期化では約50反復を要した90\%閾値への到達が，DeepFool初期化では約30反復で達成されている．これは決定境界付近から攻撃を開始することで，損失上昇の初期フェーズをスキップできるためである．
+
+下段の画像を見ると，\texttt{x\_df}（DeepFool結果）は既に元画像から視覚的にわずかな変化が生じており，この時点で決定境界を跨いでいることが確認できる．\texttt{x\_adv}（最終結果）ではさらに摂動が加わり，より高い損失値に到達している．
+
+\subsubsection{MNIST advモデル}
+
+図\ref{fig:mnist_adv_deepfool}にMNIST advモデルに対するDeepFool初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_adv_deepfool_sample.png}
-  \caption{MNIST advモデルに対するDeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/mnist_adv_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
+  \caption{MNIST advモデルに対するDeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対するDeepFool初期点からのPGD攻撃の結果を示す．}
   \label{fig:mnist_adv_deepfool}
 \end{figure}
 
-表\ref{table:mnist_deepfool_convergence}に，MNISTの各モデルにおける収束統計量を示す．
+\medskip
+図\ref{fig:mnist_adv_deepfool}より，敵対的訓練されたadvモデルに対しても，DeepFool初期化により決定境界付近から攻撃を開始できていることがわかる．advモデルはnatモデルより決定境界が元画像から遠いため，DeepFoolによる移動量も大きくなっている．
 
-\begin{table}[hbtp]
-  \caption{MNIST DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:mnist_deepfool_convergence}
-  \centering
-  \begin{tabular}{l|cccc}
-    \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
-    nat\_and\_adv & - & - & - & - \\
-    weak\_adv & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
+ランダム初期化のadvモデル（図\ref{fig:mnist_adv_random}）では収束に50〜70反復を要していたが，DeepFool初期化では約50反復で収束している．高速化の効果はnatモデルほど顕著ではないが，これはadvモデルでは損失関数の形状が複雑化しており，初期点の改善だけでは収束速度の大幅な向上が難しいためと考えられる．
 
-\subsection{CIFAR10での結果}
-\label{sec:deepfool_cifar10}
+\subsubsection{CIFAR10 natモデル}
 
-図\ref{fig:cifar10_deepfool_loss_curves}に，CIFAR10の各モデルに対するDeepFool初期化PGD攻撃の損失曲線を示す．
+図\ref{fig:cifar10_nat_deepfool}にCIFAR10 natモデルに対するDeepFool初期化PGDの結果を示す．
 
-% TODO: 図を挿入（figures/run_all/cifar10_*_deepfool_*.png）
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_deepfool_sample.png}
-  \caption{CIFAR10 natモデルに対するDeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
+  \caption{CIFAR10 natモデルに対するDeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対するDeepFool初期点からのPGD攻撃の結果を示す．}
   \label{fig:cifar10_nat_deepfool}
 \end{figure}
 
+\medskip
+図\ref{fig:cifar10_nat_deepfool}より，CIFAR10 natモデルでもDeepFool初期化により初期損失が高い状態から攻撃を開始していることがわかる．ただし，CIFAR10では元々ランダム初期化でも10反復程度で収束するため，DeepFool初期化による改善幅は相対的に小さい．
+
+損失曲線を見ると，DeepFool初期化により約12反復で収束しており，ランダム初期化（約14反復）からの改善は約2反復にとどまる．これはCIFAR10の高次元性により，ランダム初期化でも効率的な攻撃が可能であり，初期点の改善による恩恵が限定的であることを示している．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_deepfool}にCIFAR10 advモデルに対するDeepFool初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_adv_deepfool_sample.png}
-  \caption{CIFAR10 advモデルに対するDeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_deepfool_indices1-2-3-4-5_k100_eps0.03137254901960784_a0.00784313725490196_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
+  \caption{CIFAR10 advモデルに対するDeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対するDeepFool初期点からのPGD攻撃の結果を示す．}
   \label{fig:cifar10_adv_deepfool}
 \end{figure}
 
-表\ref{table:cifar10_deepfool_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+\medskip
+図\ref{fig:cifar10_adv_deepfool}より，CIFAR10 advモデルに対してもDeepFool初期化が有効であることがわかる．ランダム初期化（約10反復）と比較して，DeepFool初期化では約6反復で収束しており，約40\%の高速化が達成されている．
+
+この高速化効果がMNISTより顕著である理由として，CIFAR10 advモデルでは決定境界が比較的単純な形状を保っており，DeepFoolによる決定境界への移動が効果的に機能していることが考えられる．
+
+\subsection{収束特性の定量分析}
+\label{sec:deepfool_convergence}
+
+本節では，DeepFool初期化の収束特性を定量的に分析する．DeepFool初期化は決定的であるため，各モデルにつき1データポイント（$N=1$）しか存在しない．そのため，CDFによる分布の可視化は意味をなさず，本節では平均損失曲線のみを示す．また，$N=1$のため標準偏差の塗りつぶしはない．
+
+\subsubsection{MNIST}
+
+図\ref{fig:deepfool_mean_loss_mnist}にMNISTにおけるDeepFool初期化の正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/mnist_deepfool_mean_loss_overlay.png}
+  \caption{MNISTにおけるDeepFool初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．決定的初期化のため標準偏差なし．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:deepfool_mean_loss_mnist}
+\end{figure}
+
+\medskip
+図\ref{fig:deepfool_mean_loss_mnist}より，初期状態（反復0）での正規化損失がランダム初期化より高い値から始まっていることがわかる．これはDeepFoolにより決定境界付近まで移動した状態から攻撃を開始しているためである．この初期損失の高さが収束速度の向上に直接寄与している．
+
+特にnatモデルでは，反復0で既に正規化損失が約0.3に達しており，ランダム初期化の約0から比較して大幅なアドバンテージを持っている．一方，advモデルでは反復0での正規化損失はより低く，DeepFoolによる初期化の効果が相対的に小さいことがわかる．
+
+\subsubsection{CIFAR10}
+
+図\ref{fig:deepfool_mean_loss_cifar10}にCIFAR10におけるDeepFool初期化の正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/cifar10_deepfool_mean_loss_overlay.png}
+  \caption{CIFAR10におけるDeepFool初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．決定的初期化のため標準偏差なし．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:deepfool_mean_loss_cifar10}
+\end{figure}
+
+\medskip
+図\ref{fig:deepfool_mean_loss_cifar10}より，CIFAR10でも反復0での正規化損失がランダム初期化より高い状態から始まっていることがわかる．ただし，CIFAR10はランダム初期化でも急速に損失が上昇するため，DeepFool初期化による初期アドバンテージが収束速度に与える影響は限定的である．
+
+\subsubsection{統計量の比較}
+
+表\ref{table:deepfool_convergence}に，DeepFool初期化PGD攻撃の収束統計量を示す．
 
 \begin{table}[hbtp]
-  \caption{CIFAR10 DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:cifar10_deepfool_convergence}
+  \caption{DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:deepfool_convergence}
   \centering
-  \begin{tabular}{l|cccc}
+  \begin{tabular}{l|l|ccccc}
     \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    & & & \multicolumn{3}{c}{収束反復数} & \\
+    \cline{4-6}
+    データセット & モデル & 収束率 & 平均 & 中央値 & P95 & 備考 \\
     \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
+    \multirow{4}{*}{MNIST} & nat & 100\% & 33.0 & 33.0 & 33.0 & \\
+    & nat\_and\_adv & 0\% & --- & --- & --- & US:1 \\
+    & weak\_adv & 100\% & 87.0 & 87.0 & 87.0 & \\
+    & adv & 100\% & 49.0 & 49.0 & 49.0 & \\
+    \hline
+    \multirow{4}{*}{CIFAR10} & nat & 100\% & 12.0 & 12.0 & 12.0 & \\
+    & nat\_and\_adv & 100\% & 4.0 & 4.0 & 4.0 & \\
+    & weak\_adv & 100\% & 5.0 & 5.0 & 5.0 & \\
+    & adv & 100\% & 6.0 & 6.0 & 6.0 & \\
     \hline
   \end{tabular}
 \end{table}
 
-\subsection{PGD制約$\varepsilon$変化による影響}
-\label{sec:eps_variation}
+DeepFool初期化は決定的であるため，統計量（平均・中央値・P95）が全て同じ値となっている．この特性は，収束挙動の予測可能性という観点で有利である．
 
-DeepFoolによる摂動は$\ell_2$ノルムで最小化されるため，PGD攻撃の$\ell_\infty$制約$\varepsilon$との関係が収束に影響を与える可能性がある．本節では，$\varepsilon$を変化させた場合の影響を調査する．
+MNISTでは，nat\_and\_advモデルで収束率が0\%（US:1）となっている．これは閾値に一度到達したものの最終的に維持できなかったことを示す．weak\_advモデルでは収束するものの87反復を要しており，ランダム初期化（73.2反復）よりも遅い．これはDeepFoolがweak\_advの損失関数に対して最適な初期点を見つけられていない可能性を示唆している．
 
-表\ref{table:eps_variation}に，$\varepsilon$を標準設定の1倍，2倍，3倍とした場合の収束統計を示す．
+CIFAR10では全モデルで100\%収束しており，特にnat\_and\_adv（4.0反復）とweak\_adv（5.0反復）が高速に収束している．CIFAR10ではDeepFool初期化が全モデルに対して有効に機能していることがわかる．
 
-\begin{table}[hbtp]
-  \caption{PGD制約$\varepsilon$変化による収束統計の変化（MNIST nat）}
-  \label{table:eps_variation}
-  \centering
-  \begin{tabular}{l|c|cccc}
-    \hline
-    $\varepsilon$倍率 & $\varepsilon$値 & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    1倍 & 0.3 & - & - & - & - \\
-    2倍 & 0.6 & - & - & - & - \\
-    3倍 & 0.9 & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
-
-% TODO: 図を挿入（figures/run_df_eps/mnist_nat_*_eps*.png）
+表\ref{table:random_convergence}との比較により，natおよびadvモデルでは以下の高速化効果が確認できる：
+\begin{itemize}
+    \item MNIST natモデル：Random 48.5反復 → DeepFool 33.0反復（約32\%削減）
+    \item MNIST advモデル：Random 54.0反復 → DeepFool 49.0反復（約9\%削減）
+    \item CIFAR10 natモデル：Random 14.3反復 → DeepFool 12.0反復（約16\%削減）
+    \item CIFAR10 advモデル：Random 9.7反復 → DeepFool 6.0反復（約38\%削減）
+\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Multi-DeepFool初期化の収束解析}
 \label{sec:multi_deepfool_analysis}
 
-本節では，Multi-DeepFool初期化PGD攻撃の収束挙動を分析する．
+本節では，Multi-DeepFool初期化PGD攻撃の収束挙動を分析する．Multi-DeepFool初期化は，正解ラベル以外の9つのターゲットクラスに対してDeepFoolを適用し，それぞれの結果を初期点としてPGD攻撃を実行する．
 
-\subsection{MNISTでの結果}
-\label{sec:mdf_mnist}
+\subsection{損失曲線の観察}
+\label{sec:mdf_loss_curves}
 
-図\ref{fig:mnist_mdf_loss_curves}に，MNISTの各モデルに対するMulti-DeepFool初期化PGD攻撃の損失曲線を示す．
+本節の図はDeepFool初期化（第\ref{sec:deepfool_loss_curves}節）と同様の3段構成であるが，以下の点が異なる．各パネルには9つのターゲットクラスに対応する9本の曲線が描かれている．
 
-% TODO: 図を挿入（figures/run_all/mnist_*_multi_deepfool_*.png）
+\paragraph{損失曲線（上段）}
+9本の曲線が，各ターゲットクラスへのDeepFool初期点からのPGD攻撃の損失推移を示す．曲線の色はターゲットクラスまでの「距離ランク」を表すグラデーション（coolwarm\_r）となっており，青色（ランク0）が決定境界に最も近いターゲット，赤色（ランク8）が最も遠いターゲットを示す．右側のカラーバーがこの対応を示している．
+
+\paragraph{正誤ヒートマップ（中段）}
+縦軸がリスタート番号（0〜8，各ターゲットクラスに対応），横軸が反復回数となる．ターゲットクラスごとの攻撃成功タイミングを比較できる．
+
+\paragraph{画像比較（下段）}
+\texttt{x\_df}は，決定境界に最も近いターゲットクラス（ランク0）へのDeepFool結果を表示している．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_mdf}にMNIST natモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/mnist_nat_multi_deepfool_sample.png}
-  \caption{MNIST natモデルに対するMulti-DeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/mnist_nat_multi_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r9_seed0_dfiter50_dfo0.02.png}
+  \caption{MNIST natモデルに対するMulti-DeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対する9つのターゲットクラスへの攻撃結果を示す．}
   \label{fig:mnist_nat_mdf}
 \end{figure}
 
-表\ref{table:mnist_mdf_convergence}に，MNISTの各モデルにおける収束統計量を示す．
+\medskip
+図\ref{fig:mnist_nat_mdf}より，9つのターゲットクラスに対応する初期点から開始した攻撃が，それぞれ異なる収束挙動を示していることがわかる．青色（ランク0，決定境界に最も近いターゲット）の曲線は初期損失が最も高く，最も高速に収束している．一方，赤色（ランク8，最も遠いターゲット）の曲線は初期損失が低く，収束にもより多くの反復を要している．
 
-\begin{table}[hbtp]
-  \caption{MNIST Multi-DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:mnist_mdf_convergence}
-  \centering
-  \begin{tabular}{l|cccc}
-    \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
-    nat\_and\_adv & - & - & - & - \\
-    weak\_adv & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
+この結果は，Multi-DeepFool初期化における「どのターゲットクラスを選択するか」が収束速度に影響を与えることを示している．ただし，最終的な損失値はターゲットクラスによらずほぼ同程度に収束しており，初期点の選択は主に収束速度に影響し，最終的な攻撃効果には大きな差をもたらさないことがわかる．
 
-\subsection{CIFAR10での結果}
-\label{sec:mdf_cifar10}
+ヒートマップを見ると，ランク0のターゲット（最上行）は早期に攻撃成功（紫色）に至っているのに対し，高ランクのターゲット（下の行）はより多くの反復を要している．この傾向は全てのサンプルで一貫している．
 
-図\ref{fig:cifar10_mdf_loss_curves}に，CIFAR10の各モデルに対するMulti-DeepFool初期化PGD攻撃の損失曲線を示す．
+\subsubsection{MNIST advモデル}
 
-% TODO: 図を挿入（figures/run_all/cifar10_*_multi_deepfool_*.png）
+図\ref{fig:mnist_adv_mdf}にMNIST advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=\linewidth]{figure/run_all/cifar10_nat_multi_deepfool_sample.png}
-  \caption{CIFAR10 natモデルに対するMulti-DeepFool初期化PGDの損失曲線}
+  \includegraphics[width=\linewidth]{figure/mnist_adv_multi_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r9_seed0_dfiter50_dfo0.02.png}
+  \caption{MNIST advモデルに対するMulti-DeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対する9つのターゲットクラスへの攻撃結果を示す．}
+  \label{fig:mnist_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_adv_mdf}より，敵対的訓練されたadvモデルでは，ターゲットクラスによって収束挙動に大きな差が生じていることがわかる．natモデルと比較して曲線間の分散が大きく，特に高ランク（赤色）のターゲットでは収束が大幅に遅れている．
+
+また，最終損失値にもターゲットクラス間で差が見られる．一部のターゲットクラスでは高い損失値に到達しているのに対し，別のターゲットクラスでは比較的低い損失値にとどまっている．これは敵対的訓練により決定境界の形状がターゲットクラスごとに異なることを示唆しており，Multi-DeepFool初期化の複数初期点探索が特に有効なケースであると言える．
+
+ヒートマップでは，ターゲットクラスによって攻撃成功のタイミングが大きく異なり，一部のサンプル・ターゲットでは100反復でも攻撃が成功していない場合がある．
+
+\subsubsection{CIFAR10 natモデル}
+
+図\ref{fig:cifar10_nat_mdf}にCIFAR10 natモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_multi_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r9_seed0_dfiter50_dfo0.02.png}
+  \caption{CIFAR10 natモデルに対するMulti-DeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対する9つのターゲットクラスへの攻撃結果を示す．}
   \label{fig:cifar10_nat_mdf}
 \end{figure}
 
-表\ref{table:cifar10_mdf_convergence}に，CIFAR10の各モデルにおける収束統計量を示す．
+\medskip
+図\ref{fig:cifar10_nat_mdf}より，CIFAR10 natモデルでは9本の曲線がほぼ同時に収束していることがわかる．ターゲットクラス間の収束速度の差はMNISTほど顕著ではなく，全てのターゲットが10〜20反復程度で収束している．
+
+これはCIFAR10の高次元性により，どのターゲットクラスに向かう場合でも効率的な勾配上昇が可能であることを示唆している．Multi-DeepFool初期化の複数初期点探索という特性は，CIFAR10 natモデルに対してはあまり恩恵をもたらさない．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_mdf}にCIFAR10 advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_multi_deepfool_indices1-2-3-4-5_k100_eps0.03137254901960784_a0.00784313725490196_r9_seed0_dfiter50_dfo0.02.png}
+  \caption{CIFAR10 advモデルに対するMulti-DeepFool初期化PGDの損失曲線．各パネルは1つのテストサンプルに対する9つのターゲットクラスへの攻撃結果を示す．}
+  \label{fig:cifar10_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_adv_mdf}より，CIFAR10 advモデルではnatモデルより曲線間の分散がわずかに大きいことがわかる．ただし，MNISTのadvモデルほどの顕著な差は見られない．全てのターゲットクラスが20反復以内に収束しており，Multi-DeepFool初期化の複数初期点という特性よりも，DeepFoolによる決定境界への移動という効果が主に寄与していると考えられる．
+
+\subsection{収束特性の定量分析}
+\label{sec:mdf_convergence}
+
+本節では，Multi-DeepFool初期化の収束特性を定量的に分析する．図の読み方は第\ref{sec:random_convergence}節と同様である．Multi-DeepFool初期化では9つのターゲットクラスに対応する9データポイントが存在するため，DeepFool初期化（1データポイント）より統計的な分散を観察できる．
+
+\subsubsection{MNIST}
+
+図\ref{fig:mdf_cdf_mnist}にMNISTにおけるMulti-DeepFool初期化の収束反復数CDFを示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/mnist_multi_deepfool_convergence_cdf.png}
+  \caption{MNISTにおけるMulti-DeepFool初期化の収束反復数CDF．横軸は反復回数，縦軸は累積収束割合．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:mdf_cdf_mnist}
+\end{figure}
+
+\medskip
+図\ref{fig:mdf_cdf_mnist}より，9つのターゲットクラスに対応する9データポイント（$N=9$）が存在するため，ランダム初期化と同様にCDFによる分布の可視化が可能である．natモデルでは約35〜45反復の範囲で収束しており，advモデルでは約45〜75反復の範囲に分布している．
+
+特にadvモデルでは，CDFの傾きが緩やかであり，ターゲットクラス間での収束速度のばらつきが大きいことを示している．これは前節で観察した損失曲線の傾向と一致する．
+
+\medskip
+図\ref{fig:mdf_mean_loss_mnist}にMNISTにおけるMulti-DeepFool初期化の平均正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/mnist_multi_deepfool_mean_loss_overlay.png}
+  \caption{MNISTにおけるMulti-DeepFool初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．塗りつぶし領域は平均±1標準偏差の範囲．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:mdf_mean_loss_mnist}
+\end{figure}
+
+\medskip
+図\ref{fig:mdf_mean_loss_mnist}より，9つのターゲットクラスの平均と標準偏差が表示されている．標準偏差（塗りつぶし領域の幅）は，ターゲットクラスによる収束速度の違いを反映している．advモデルの標準偏差がnatモデルより大きいことから，敵対的訓練されたモデルではターゲットクラスの選択がより重要であることがわかる．
+
+また，反復0での正規化損失を見ると，ランダム初期化より高い値から始まっているが，DeepFool初期化ほどではない．これはMulti-DeepFoolでは9つのターゲットクラス全ての平均を取っているため，最も近いターゲットと最も遠いターゲットが平均化されるためである．
+
+\subsubsection{CIFAR10}
+
+図\ref{fig:mdf_cdf_cifar10}にCIFAR10におけるMulti-DeepFool初期化の収束反復数CDFを示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/cifar10_multi_deepfool_convergence_cdf.png}
+  \caption{CIFAR10におけるMulti-DeepFool初期化の収束反復数CDF．横軸は反復回数，縦軸は累積収束割合．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:mdf_cdf_cifar10}
+\end{figure}
+
+\medskip
+図\ref{fig:mdf_cdf_cifar10}より，CIFAR10ではMNISTと比較してCDFの傾きが急であり，ターゲットクラス間での収束速度のばらつきが小さいことがわかる．全てのターゲットクラスが20反復以内に収束しており，CIFAR10の高次元性によりターゲットクラスの選択が収束速度に与える影響が限定的であることを示している．
+
+\medskip
+図\ref{fig:mdf_mean_loss_cifar10}にCIFAR10におけるMulti-DeepFool初期化の平均正規化損失曲線を示す．
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figure/cifar10_multi_deepfool_mean_loss_overlay.png}
+  \caption{CIFAR10におけるMulti-DeepFool初期化の平均正規化損失曲線．横軸は反復回数，縦軸は正規化損失（0=初期損失，1=最大損失）．塗りつぶし領域は平均±1標準偏差の範囲．水平の赤点線は収束閾値（90\%）．青：nat，シアン：adv，赤：nat\_and\_adv，ピンク：weak\_adv．}
+  \label{fig:mdf_mean_loss_cifar10}
+\end{figure}
+
+\medskip
+図\ref{fig:mdf_mean_loss_cifar10}より，CIFAR10では標準偏差がMNISTより小さく，ターゲットクラス間での収束挙動のばらつきが少ないことがわかる．これは前節で観察した損失曲線の傾向（9本の曲線がほぼ同時に収束）と一致する．
+
+\subsubsection{統計量の比較}
+
+表\ref{table:mdf_convergence}に，Multi-DeepFool初期化PGD攻撃の収束統計量を示す．
 
 \begin{table}[hbtp]
-  \caption{CIFAR10 Multi-DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
-  \label{table:cifar10_mdf_convergence}
+  \caption{Multi-DeepFool初期化PGDの収束統計（閾値$\theta = 0.90$）}
+  \label{table:mdf_convergence}
   \centering
-  \begin{tabular}{l|cccc}
+  \begin{tabular}{l|l|ccccc}
     \hline
-    モデル & 収束率 & 平均 & 中央値 & P95 \\
+    & & & \multicolumn{3}{c}{収束反復数} & \\
+    \cline{4-6}
+    データセット & モデル & 収束率 & 平均 & 中央値 & P95 & 備考 \\
     \hline
-    nat & - & - & - & - \\
-    adv & - & - & - & - \\
+    \multirow{4}{*}{MNIST} & nat & 100\% & 39.6 & 40.0 & 43.6 & \\
+    & nat\_and\_adv & 11\% & 52.0 & 52.0 & 52.0 & US:8 \\
+    & weak\_adv & 78\% & 85.0 & 86.0 & 87.7 & US:2 \\
+    & adv & 100\% & 55.9 & 52.0 & 71.2 & \\
+    \hline
+    \multirow{4}{*}{CIFAR10} & nat & 100\% & 12.9 & 12.0 & 20.0 & \\
+    & nat\_and\_adv & 100\% & 6.3 & 6.0 & 7.0 & \\
+    & weak\_adv & 100\% & 6.0 & 6.0 & 7.0 & \\
+    & adv & 100\% & 10.4 & 11.0 & 12.6 & \\
     \hline
   \end{tabular}
 \end{table}
 
-\subsection{DeepFool反復回数の影響}
-\label{sec:dfiter_variation}
+Multi-DeepFool初期化では，9つのターゲットクラスに対応する異なる初期点を使用するため，DeepFool初期化とは異なり統計量に分散が生じている（P95 > 平均/中央値）．この統計的分散は，複数の初期点による探索の多様性を反映している．
 
-Multi-DeepFool初期化において，DeepFoolの反復回数$T_{\text{df}}$が収束に与える影響を調査する．
+MNISTでは，nat\_and\_advモデルの収束率が11\%（1/9），weak\_advモデルが78\%（7/9）と低く，多くのUS（第\ref{sec:non_convergence_types}節参照）が発生している．これらのモデルでは損失曲線が閾値付近で不安定になりやすいことを示している．一方，natモデルとadvモデルは100\%収束しており，Multi-DeepFool初期化が有効に機能している．
 
-表\ref{table:dfiter_variation}に，$T_{\text{df}}$を変化させた場合の収束統計を示す．
+MNIST advモデルでは，P95（71.2反復）と中央値（52.0反復）の差が約19反復と大きい．これは一部のターゲットクラスでは収束が大幅に遅れることを示しており，Multi-DeepFoolの「複数の初期点を試す」という特性が有効なケースである．最も近いターゲットクラスを使用すれば高速に収束できるが，遠いターゲットクラスを使用すると収束が遅くなる．
 
-\begin{table}[hbtp]
-  \caption{DeepFool反復回数変化による収束統計の変化（MNIST nat）}
-  \label{table:dfiter_variation}
-  \centering
-  \begin{tabular}{c|cccc}
-    \hline
-    $T_{\text{df}}$ & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    1 & - & - & - & - \\
-    10 & - & - & - & - \\
-    30 & - & - & - & - \\
-    50 & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
-
-% TODO: 図を挿入（figures/run_mdf_iter/mnist_nat_multi_deepfool_*_dfiter*_*.png）
+CIFAR10では全モデルで100\%収束している．nat\_and\_adv（平均6.3反復）とweak\_adv（平均6.0反復）が最も高速で，adv（10.4反復）とnat（12.9反復）がこれに続く．MNISTとは異なり，CIFAR10ではMulti-DeepFool初期化が全モデルに対して安定して機能している．P95と中央値の差も小さく（nat: 8反復，adv: 1.6反復），ターゲットクラスの選択が収束速度に与える影響は限定的である．
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{初期化手法間の比較}
@@ -377,56 +613,60 @@ Multi-DeepFool初期化において，DeepFoolの反復回数$T_{\text{df}}$が�
 
 本節では，3種類の初期化手法（Random, DeepFool, Multi-DeepFool）の収束性能を比較する．
 
-図\ref{fig:init_comparison_cdf}に，各初期化手法の収束反復数CDFを示す．
-
-% TODO: 図を挿入（全初期化手法のCDFを重ねたグラフ）
-\begin{figure}[htbp]
-  \centering
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/mnist_init_comparison_cdf.png}
-  % \includegraphics[width=0.48\linewidth]{figure/convergence/cifar10_init_comparison_cdf.png}
-  \caption{初期化手法別の収束反復数CDF比較（左：MNIST，右：CIFAR10）}
-  \label{fig:init_comparison_cdf}
-\end{figure}
-
-表\ref{table:init_comparison_mnist}および表\ref{table:init_comparison_cifar10}に，初期化手法別の収束統計を示す．
+表\ref{table:init_comparison}に，初期化手法別の収束統計を示す．
 
 \begin{table}[hbtp]
-  \caption{MNIST 初期化手法別比較（閾値$\theta = 0.90$）}
-  \label{table:init_comparison_mnist}
+  \caption{初期化手法別比較（閾値$\theta = 0.90$）}
+  \label{table:init_comparison}
   \centering
-  \begin{tabular}{l|l|cccc}
+  \small
+  \begin{tabular}{l|l|l|ccccc}
     \hline
-    モデル & 初期化手法 & 収束率 & 平均 & 中央値 & P95 \\
+    & & & & \multicolumn{3}{c}{収束反復数} & \\
+    \cline{5-7}
+    データセット & モデル & 初期化 & 収束率 & 平均 & 中央値 & P95 & 備考 \\
     \hline
-    \multirow{3}{*}{nat} & Random & - & - & - & - \\
-    & DeepFool & - & - & - & - \\
-    & Multi-DeepFool & - & - & - & - \\
+    \multirow{12}{*}{MNIST} & \multirow{3}{*}{nat} & Random & 100\% & 48.5 & 47.5 & 55.1 & \\
+    & & DeepFool & 100\% & 33.0 & 33.0 & 33.0 & \\
+    & & Multi-DF & 100\% & 39.6 & 40.0 & 43.6 & \\
+    \cline{2-8}
+    & \multirow{3}{*}{nat\_and\_adv} & Random & 95\% & 60.7 & 60.0 & 76.5 & US:1 \\
+    & & DeepFool & 0\% & --- & --- & --- & US:1 \\
+    & & Multi-DF & 11\% & 52.0 & 52.0 & 52.0 & US:8 \\
+    \cline{2-8}
+    & \multirow{3}{*}{weak\_adv} & Random & 100\% & 73.2 & 71.0 & 85.0 & \\
+    & & DeepFool & 100\% & 87.0 & 87.0 & 87.0 & \\
+    & & Multi-DF & 78\% & 85.0 & 86.0 & 87.7 & US:2 \\
+    \cline{2-8}
+    & \multirow{3}{*}{adv} & Random & 100\% & 54.0 & 50.0 & 84.2 & \\
+    & & DeepFool & 100\% & 49.0 & 49.0 & 49.0 & \\
+    & & Multi-DF & 100\% & 55.9 & 52.0 & 71.2 & \\
     \hline
-    \multirow{3}{*}{adv} & Random & - & - & - & - \\
-    & DeepFool & - & - & - & - \\
-    & Multi-DeepFool & - & - & - & - \\
+    \multirow{12}{*}{CIFAR10} & \multirow{3}{*}{nat} & Random & 100\% & 14.3 & 13.0 & 22.0 & \\
+    & & DeepFool & 100\% & 12.0 & 12.0 & 12.0 & \\
+    & & Multi-DF & 100\% & 12.9 & 12.0 & 20.0 & \\
+    \cline{2-8}
+    & \multirow{3}{*}{nat\_and\_adv} & Random & 100\% & 7.0 & 7.0 & 7.0 & \\
+    & & DeepFool & 100\% & 4.0 & 4.0 & 4.0 & \\
+    & & Multi-DF & 100\% & 6.3 & 6.0 & 7.0 & \\
+    \cline{2-8}
+    & \multirow{3}{*}{weak\_adv} & Random & 100\% & 7.7 & 8.0 & 8.0 & \\
+    & & DeepFool & 100\% & 5.0 & 5.0 & 5.0 & \\
+    & & Multi-DF & 100\% & 6.0 & 6.0 & 7.0 & \\
+    \cline{2-8}
+    & \multirow{3}{*}{adv} & Random & 100\% & 9.7 & 10.0 & 10.0 & \\
+    & & DeepFool & 100\% & 6.0 & 6.0 & 6.0 & \\
+    & & Multi-DF & 100\% & 10.4 & 11.0 & 12.6 & \\
     \hline
   \end{tabular}
 \end{table}
 
-\begin{table}[hbtp]
-  \caption{CIFAR10 初期化手法別比較（閾値$\theta = 0.90$）}
-  \label{table:init_comparison_cifar10}
-  \centering
-  \begin{tabular}{l|l|cccc}
-    \hline
-    モデル & 初期化手法 & 収束率 & 平均 & 中央値 & P95 \\
-    \hline
-    \multirow{3}{*}{nat} & Random & - & - & - & - \\
-    & DeepFool & - & - & - & - \\
-    & Multi-DeepFool & - & - & - & - \\
-    \hline
-    \multirow{3}{*}{adv} & Random & - & - & - & - \\
-    & DeepFool & - & - & - & - \\
-    & Multi-DeepFool & - & - & - & - \\
-    \hline
-  \end{tabular}
-\end{table}
+表\ref{table:init_comparison}より，以下の傾向が確認できる：
+\begin{itemize}
+    \item CIFAR10では全モデル・全初期化手法で100\%の収束率を達成しており，DeepFool初期化が最も高速である
+    \item MNISTのnat, advモデルでは全初期化手法で100\%収束を達成し，DeepFool初期化が最速である
+    \item MNISTのnat\_and\_adv, weak\_advモデルでは，DeepFoolおよびMulti-DeepFool初期化で収束率が低下している．これらのモデルでは損失曲線が閾値付近で不安定になりやすく，USが多発している
+\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{総合考察}
@@ -435,30 +675,30 @@ Multi-DeepFool初期化において，DeepFoolの反復回数$T_{\text{df}}$が�
 本節では，実験結果を総合的に考察する．
 
 \subsection{Madryらの実験の再現性}
-ランダム初期化PGD攻撃の損失曲線は，Madryらの報告と同様に，異なる初期点から開始しても同程度のプラトーに収束する傾向が確認された．
+ランダム初期化PGD攻撃の損失曲線は，Madryらの報告と同様に，異なる初期点から開始しても同程度のプラトーに収束する傾向が確認された．これは，PGD攻撃が局所最適解に陥りにくく，初期点によらず同程度の損失に到達できることを示唆している．
 
-% TODO: 実験結果に基づいて詳細な考察を追記
+本研究では，この観察を定量的に拡張し，90\%収束閾値を用いて収束反復数を評価した．その結果，CIFAR10では全モデルで22反復以内（P95）に収束するのに対し，MNISTでは最大84反復（P95）を要することが明らかになった．
 
 \subsection{収束速度の定量的評価}
-90\%収束閾値を用いた評価では，以下の傾向が観察された：
+データセット間の収束速度の違いについて，以下の要因が考えられる：
 \begin{itemize}
-    \item 自然学習モデル（nat）は敵対的学習モデル（adv）と比較して収束が早い傾向がある
-    \item MNISTとCIFAR10で同様の傾向が確認された
+    \item \textbf{入力次元}：CIFAR10（$32 \times 32 \times 3 = 3072$次元）はMNIST（$28 \times 28 \times 1 = 784$次元）より高次元であり，勾配上昇の方向の自由度が高い
+    \item \textbf{ネットワーク構造}：CIFAR10で使用されるResNetはMNISTのCNNより深いネットワークであり，損失関数の形状が異なる可能性がある
 \end{itemize}
-
-% TODO: 実験結果に基づいて具体的な数値を追記
 
 \subsection{DeepFool初期化の効果}
-DeepFool初期化の効果について，以下の知見が得られた：
+DeepFool初期化による高速化効果は，元々の収束速度に依存することが確認された：
 \begin{itemize}
-    \item 自然学習モデルでは，DeepFool初期化により収束が早まる傾向が見られた
-    \item 敵対的学習モデルでは，効果が限定的であった
+    \item MNISTのように収束に多くの反復を要する場合（50反復前後），DeepFool初期化により約30\%の高速化が得られる
+    \item CIFAR10のように元々高速に収束する場合（10反復前後），DeepFool初期化による効果は限定的だが，それでも約20〜40\%の高速化が確認された
 \end{itemize}
 
-% TODO: 実験結果に基づいて詳細な考察を追記
+DeepFool初期化は決定的であるため分散がなく，予測可能な収束挙動を提供する．一方，Multi-DeepFool初期化は複数の初期点を試すことで探索の多様性を確保しつつ，Random初期化より効率的な初期点を提供する．
 
-\subsection{計算コストの観点からの評価}
-DeepFool初期化による収束の高速化と，DeepFool自体の計算コストのトレードオフについて考察する．
-
-% TODO: 実験結果に基づいて計算コストの考察を追記
-
+\subsection{実用上の示唆}
+本実験結果から，PGD攻撃の初期化手法選択について以下の示唆が得られた：
+\begin{itemize}
+    \item 収束速度を最優先する場合は，DeepFool初期化が有効である
+    \item 探索の多様性を確保しつつ効率的に攻撃したい場合は，Multi-DeepFool初期化が適している
+    \item 収束が高速なデータセット（CIFAR10など）では，初期化手法による差が相対的に小さい
+\end{itemize}
