@@ -642,14 +642,24 @@ def get_color_for_init_model(init: str, model: str) -> str:
     return colors.get((init, model), "gray")
 
 
-def get_linestyle_for_model(model: str) -> str:
+def get_linestyle_for_model(model: str, dataset: str = "mnist") -> str:
     """Get line style for each model to add extra distinction."""
-    styles = {
-        "nat": "-",
-        "nat_and_adv": "--",
-        "adv": "-.",
-        "weak_adv": (0, (3, 1)),  # より密な点線
-    }
+    if dataset == "cifar10":
+        # CIFAR10: more distinct linestyles for narrow data range
+        styles = {
+            "nat": "-",
+            "nat_and_adv": (0, (5, 2)),  # dashed (longer)
+            "adv": "-.",
+            "weak_adv": (0, (1, 1)),  # dotted (dense)
+        }
+    else:
+        # MNIST: default styles
+        styles = {
+            "nat": "-",
+            "nat_and_adv": "--",
+            "adv": "-.",
+            "weak_adv": (0, (3, 1)),
+        }
     return styles.get(model, "-")
 
 
@@ -691,9 +701,13 @@ def plot_misclassification_cdf_overlay(
 
             attack_rate = len(misclassified) / n_total * 100
             label = f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_failed})"
-            # Use same color for same init, distinguish by linestyle
-            color = get_color_for_init(init)
-            linestyle = get_linestyle_for_model(model)
+            # CIFAR10: use distinct colors per init/model due to narrow data range
+            # MNIST: use same color for same init, distinguish by linestyle
+            if dataset == "cifar10":
+                color = get_color_for_init_model(init, model)
+            else:
+                color = get_color_for_init(init)
+            linestyle = get_linestyle_for_model(model, dataset)
             lw = linewidths.get(model, 2.0)
             ms = marker_sizes.get(model, 100)
             zo = zorders.get(model, 10)
