@@ -685,7 +685,9 @@ def plot_misclassification_cdf_overlay(
 
             attack_rate = len(misclassified) / n_total * 100
             label = f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_failed})"
-            color = get_color_for_init_model(init, model)
+            # Use same color for same init, distinguish by linestyle
+            color = get_color_for_init(init)
+            linestyle = get_linestyle_for_model(model)
 
             if len(misclassified) == 0:
                 handle = ax.plot([], [], color="lightgray", linewidth=1.5, linestyle="--")[0]
@@ -695,7 +697,6 @@ def plot_misclassification_cdf_overlay(
             sorted_iters = np.sort(misclassified)
             cdf = np.arange(1, len(sorted_iters) + 1) / n_total
 
-            linestyle = get_linestyle_for_model(model)
             if n_total == 1:
                 handle = ax.scatter(
                     sorted_iters,
@@ -800,14 +801,14 @@ def plot_misclassification_histogram_overlay(
             color=color,
             alpha=0.9,
             edgecolor="black",
-            linewidth=0.5,
+            linewidth=0.7,
             label=f"{init}/{model} (n={n_total}, {attack_rate:.0f}%, fail={n_not_count}){label_suffix}",
         )
 
         fail_x = n_bins + 1.5 + idx * bar_width - (n_groups - 1) * bar_width / 2
         ax.bar(
             fail_x, n_not_count, width=bar_width, color=color,
-            alpha=0.9, hatch="//", edgecolor="black", linewidth=0.5,
+            alpha=0.9, hatch="//", edgecolor="black", linewidth=0.7,
         )
 
     if max_iter <= 20:
@@ -837,15 +838,16 @@ def plot_misclassification_histogram_overlay(
     print(f"[SAVE] Misclassification histogram overlay: {out_path}")
 
 
-def plot_model_comparison_boxplot(
+def plot_model_comparison_barplot(
     stats_by_model: Dict[str, Dict[str, Dict[str, np.ndarray]]],
     out_path: str,
     dataset: str,
 ) -> None:
-    """Plot boxplot comparing models for each init type (2x2 subplots).
+    """Plot attack success rate bar chart comparing models for each init type (2x2 subplots).
 
-    Each subplot shows one init type with 4 model boxplots side by side.
+    Each subplot shows one init type with 4 model bars side by side.
     This allows quick visual comparison: nat < weak_adv < nat_and_adv <= adv
+    Attack success rate is used instead of iteration count to handle models that rarely misclassify.
     """
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     axes_flat = axes.flatten()
@@ -859,11 +861,11 @@ def plot_model_comparison_boxplot(
 
     for idx, init in enumerate(INIT_ORDER):
         ax = axes_flat[idx]
-        box_data = []
-        box_labels = []
-        box_colors = []
+        attack_rates = []
+        bar_labels = []
+        bar_colors = []
         n_total_list = []
-        n_failed_list = []
+        n_success_list = []
 
         for model in MODEL_ORDER:
             if model not in stats_by_model:
@@ -875,58 +877,56 @@ def plot_model_comparison_boxplot(
             iters = stats[init]
             misclassified = iters[iters >= 0]
             n_total = len(iters)
-            n_failed = int(np.sum(iters == NOT_MISCLASSIFIED))
+            n_success = len(misclassified)
+            attack_rate = n_success / n_total * 100 if n_total > 0 else 0
 
-            if len(misclassified) > 0:
-                box_data.append(misclassified)
-            else:
-                box_data.append([])
-
-            box_labels.append(model)
-            box_colors.append(model_colors.get(model, "gray"))
+            attack_rates.append(attack_rate)
+            bar_labels.append(model)
+            bar_colors.append(model_colors.get(model, "gray"))
             n_total_list.append(n_total)
-            n_failed_list.append(n_failed)
+            n_success_list.append(n_success)
 
-        if not box_data:
+        if not attack_rates:
             ax.set_title(f"{init}: No data")
             ax.set_visible(False)
             continue
 
-        positions = list(range(1, len(box_data) + 1))
-        bp = ax.boxplot(
-            box_data,
-            positions=positions,
-            patch_artist=True,
-            widths=0.6,
-            showfliers=True,
-            flierprops={"marker": "o", "markersize": 4, "alpha": 0.5},
+        positions = list(range(len(attack_rates)))
+        bars = ax.bar(
+            positions,
+            attack_rates,
+            color=bar_colors,
+            alpha=0.8,
+            edgecolor="black",
+            linewidth=0.8,
+            width=0.6,
         )
 
-        for patch, color in zip(bp["boxes"], box_colors):
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-
-        for median in bp["medians"]:
-            median.set_color("black")
-            median.set_linewidth(2)
+        # Add value labels on bars
+        for bar, rate, n_total, n_success in zip(bars, attack_rates, n_total_list, n_success_list):
+            height = bar.get_height()
+            ax.annotate(
+                f"{rate:.0f}%\n({n_success}/{n_total})",
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 3),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                fontweight="bold",
+            )
 
         ax.set_xticks(positions)
-        x_labels = []
-        for i, label in enumerate(box_labels):
-            n_total = n_total_list[i]
-            n_failed = n_failed_list[i]
-            attack_rate = (n_total - n_failed) / n_total * 100 if n_total > 0 else 0
-            x_labels.append(f"{label}\n(n={n_total}, {attack_rate:.0f}%)")
-        ax.set_xticklabels(x_labels, fontsize=8)
-
-        ax.set_ylabel("First Misclassification Iteration")
+        ax.set_xticklabels(bar_labels, fontsize=10)
+        ax.set_ylabel("Attack Success Rate (%)")
         ax.set_title(f"{init}", fontweight="bold", fontsize=11)
+        ax.set_ylim(0, 115)  # Leave room for labels
         ax.grid(True, axis="y", alpha=0.3)
-        ax.set_ylim(bottom=0)
+        ax.axhline(y=100, color="gray", linestyle="--", alpha=0.5, linewidth=1)
 
     fig.suptitle(
-        f"Model Comparison by Init Type ({dataset.upper()})\n"
-        "Expected trend: nat < weak_adv < nat_and_adv ≤ adv",
+        f"Attack Success Rate by Model ({dataset.upper()})\n"
+        "Expected trend: nat > weak_adv > nat_and_adv ≥ adv (higher = more vulnerable)",
         fontsize=12,
         fontweight="bold",
     )
@@ -935,7 +935,7 @@ def plot_model_comparison_boxplot(
     plt.subplots_adjust(top=0.90)
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"[SAVE] Model comparison boxplot: {out_path}")
+    print(f"[SAVE] Model comparison barplot: {out_path}")
 
 
 def plot_init_comparison_cdf(
@@ -1241,11 +1241,11 @@ def main() -> None:
                 dataset,
             )
 
-        # Generate model comparison boxplot (new)
+        # Generate model comparison bar chart (attack success rate)
         if dataset in stats_by_dataset_model and stats_by_dataset_model[dataset]:
-            plot_model_comparison_boxplot(
+            plot_model_comparison_barplot(
                 stats_by_dataset_model[dataset],
-                os.path.join(dataset_dir, "model_comparison_boxplot.png"),
+                os.path.join(dataset_dir, "model_comparison_barplot.png"),
                 dataset,
             )
 
