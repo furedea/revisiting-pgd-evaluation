@@ -680,6 +680,39 @@ def plot_misclassification_cdf_overlay(
     zorders = {"nat": 14, "weak_adv": 13, "nat_and_adv": 12, "adv": 11}
     handles_labels = []
 
+    # CIFAR10: compute x-offsets to place overlapping lines/points side by side
+    if dataset == "cifar10":
+        # Count valid (non-failed) combinations first
+        valid_combinations = []
+        for init in INIT_ORDER:
+            if init not in stats_by_init:
+                continue
+            stats = stats_by_init[init]
+            for model in MODEL_ORDER:
+                if model not in stats:
+                    continue
+                model_iters = []
+                for init_key in stats[model]:
+                    model_iters.extend(stats[model][init_key].tolist())
+                if not model_iters:
+                    continue
+                iters = np.array(model_iters)
+                misclassified = iters[iters >= 0]
+                if len(misclassified) > 0:
+                    valid_combinations.append((init, model))
+
+        n_valid = len(valid_combinations)
+        # Offsets: spread within -0.25 to +0.25 range (tight grouping)
+        if n_valid > 1:
+            offsets = {
+                combo: -0.25 + 0.5 * i / (n_valid - 1)
+                for i, combo in enumerate(valid_combinations)
+            }
+        else:
+            offsets = {combo: 0.0 for combo in valid_combinations}
+    else:
+        offsets = {}
+
     for init in INIT_ORDER:
         if init not in stats_by_init:
             continue
@@ -717,8 +750,13 @@ def plot_misclassification_cdf_overlay(
                 handles_labels.append((handle, label + " [FAILED]"))
                 continue
 
-            sorted_iters = np.sort(misclassified)
+            sorted_iters = np.sort(misclassified).astype(float)
             cdf = np.arange(1, len(sorted_iters) + 1) / n_total
+
+            # CIFAR10: apply x-offset to avoid overlap
+            if dataset == "cifar10" and (init, model) in offsets:
+                x_offset = offsets[(init, model)]
+                sorted_iters = sorted_iters + x_offset
 
             if n_total == 1:
                 handle = ax.scatter(
