@@ -886,12 +886,12 @@ def plot_panels(
     show_sanity_row = False
     nrows = 3
     # Reduce heatmap height for single restart
-    heatmap_height = 0.7 if num_restarts == 1 else 1.5
+    heatmap_height = 0.3 if num_restarts == 1 else 1.5
     height_ratios = [3.2, heatmap_height, 1.6]
 
     fig_w = min(3.6 * num_panels, 16.0)
     base_h = 10.5 if nrows == 4 else 9.0
-    fig_h = base_h - 0.6 if num_restarts == 1 else base_h
+    fig_h = base_h - 1.0 if num_restarts == 1 else base_h
     fig = plt.figure(figsize=(fig_w, fig_h))
     fig.suptitle(title, fontsize=14, y=0.995)
     gs = fig.add_gridspec(
