@@ -165,8 +165,8 @@ class PGDBatchResult:
         "corrects",
         "x_adv_final",
         "x_df_endpoints",
-        "x_mdf_raw",
-        "x_mdf_rank",
+        "x_init",
+        "x_init_rank",
     )
 
     def __init__(
@@ -176,16 +176,16 @@ class PGDBatchResult:
         corrects: np.ndarray,
         x_adv_final: np.ndarray,
         x_df_endpoints: Optional[np.ndarray] = None,
-        x_mdf_raw: Optional[np.ndarray] = None,
-        x_mdf_rank: Optional[int] = None,
+        x_init: Optional[np.ndarray] = None,
+        x_init_rank: Optional[int] = None,
     ) -> None:
         self.losses = losses
         self.preds = preds
         self.corrects = corrects
         self.x_adv_final = x_adv_final
         self.x_df_endpoints = x_df_endpoints
-        self.x_mdf_raw = x_mdf_raw
-        self.x_mdf_rank = x_mdf_rank
+        self.x_init = x_init
+        self.x_init_rank = x_init_rank
 
 
 class ExamplePanel:
@@ -194,9 +194,8 @@ class ExamplePanel:
     __slots__ = (
         "x_nat",
         "y_nat",
-        "x_df",
-        "x_mdf",
-        "x_mdf_rank",
+        "x_init",
+        "x_init_rank",
         "x_adv_show",
         "show_restart",
         "pred_end",
@@ -214,16 +213,14 @@ class ExamplePanel:
         pred_end: int,
         pgd: PGDBatchResult,
         sanity: Optional[InitSanityMetrics],
-        x_df: Optional[np.ndarray] = None,
-        x_mdf: Optional[np.ndarray] = None,
-        x_mdf_rank: Optional[int] = None,
+        x_init: Optional[np.ndarray] = None,
+        x_init_rank: Optional[int] = None,
         test_idx: int = -1,
     ) -> None:
         self.x_nat = x_nat
         self.y_nat = y_nat
-        self.x_df = x_df
-        self.x_mdf = x_mdf
-        self.x_mdf_rank = x_mdf_rank
+        self.x_init = x_init
+        self.x_init_rank = x_init_rank
         self.x_adv_show = x_adv_show
         self.show_restart = show_restart
         self.pred_end = pred_end
@@ -463,14 +460,13 @@ def multi_deepfool_with_trace(
     max_iter: int,
     overshoot: float,
     eps: float,
-) -> Tuple[Tuple[np.ndarray, ...], Tuple[np.ndarray, ...], np.ndarray, np.ndarray]:
+) -> Tuple[Tuple[np.ndarray, ...], np.ndarray, np.ndarray]:
     """Multi-DeepFool with trajectory recording.
 
     Records loss/pred at each iteration for each target class, clipped to eps-ball.
 
     Returns:
         x_advs: tuple of (top_k,) final adversarial examples (clipped to eps)
-        x_advs_raw: tuple of (top_k,) final adversarial examples (without eps constraint)
         losses: (top_k, max_iter+1) - loss at each iteration
         preds: (top_k, max_iter+1) - pred at each iteration
     """
@@ -522,7 +518,6 @@ def multi_deepfool_with_trace(
 
     # Generate trajectory for each target
     x_advs = []
-    x_advs_raw = []
     for idx in range(k_actual):
         _, target_class, _ = target_distances[idx]
 
@@ -562,14 +557,11 @@ def multi_deepfool_with_trace(
         x_curr = x0 + (1.0 + float(overshoot)) * (x_curr - x0)
         x_curr = clip_to_unit_interval(x_curr)
 
-        # Save raw output (without eps constraint)
-        x_advs_raw.append(x_curr.copy())
-
         # Final point (projected to eps-ball)
         x_final = clip_to_unit_interval(project_linf(x_curr, x0, float(eps)))
         x_advs.append(x_final)
 
-    return tuple(x_advs), tuple(x_advs_raw), losses, preds
+    return tuple(x_advs), losses, preds
 
 
 def run_multi_deepfool_init_pgd(
@@ -607,7 +599,7 @@ def run_multi_deepfool_init_pgd(
     preds = np.zeros((restarts, pgd_iter + 1), dtype=np.int64)
 
     # Run multi_deepfool with trace
-    x_advs, x_advs_raw, df_losses, df_preds = multi_deepfool_with_trace(
+    x_advs, df_losses, df_preds = multi_deepfool_with_trace(
         sess=sess,
         ops=ops,
         x0=x_nat,
@@ -618,15 +610,15 @@ def run_multi_deepfool_init_pgd(
         eps=float(eps),
     )
 
-    # Find max-loss x_mdf from raw outputs (without eps constraint)
-    raw_losses = []
-    for x_raw in x_advs_raw:
-        loss_val = sess.run(ops.per_ex_loss_op, feed_dict={ops.x_ph: x_raw, ops.y_ph: y_nat})
-        raw_losses.append(float(loss_val[0]))
-    x_mdf_rank = int(np.argmax(raw_losses))
-    x_mdf_raw = x_advs_raw[x_mdf_rank].astype(np.float32)
+    # Find max-loss x_init from eps-constrained outputs
+    adv_losses = []
+    for x_adv_i in x_advs:
+        loss_val = sess.run(ops.per_ex_loss_op, feed_dict={ops.x_ph: x_adv_i, ops.y_ph: y_nat})
+        adv_losses.append(float(loss_val[0]))
+    x_init_rank = int(np.argmax(adv_losses))
+    x_init = x_advs[x_init_rank].astype(np.float32)
 
-    LOGGER.info(f"[multi_deepfool_pgd] x_mdf selected: rank={x_mdf_rank} loss={raw_losses[x_mdf_rank]:.6g}")
+    LOGGER.info(f"[multi_deepfool_pgd] x_init selected: rank={x_init_rank} loss={adv_losses[x_init_rank]:.6g}")
 
     # Prepare batch for PGD
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
@@ -661,8 +653,8 @@ def run_multi_deepfool_init_pgd(
         corrects=corrects,
         x_adv_final=x_adv.astype(np.float32),
         x_df_endpoints=x_df_endpoints,
-        x_mdf_raw=x_mdf_raw,
-        x_mdf_rank=x_mdf_rank,
+        x_init=x_init,
+        x_init_rank=x_init_rank,
     )
 
 
@@ -974,9 +966,8 @@ def plot_panels(
             ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
         ax2.tick_params(labelbottom=True)
 
-        # Display 3 images if x_df or x_mdf exists, otherwise 2
-        show_middle_img = panel.x_df is not None or panel.x_mdf is not None
-        num_imgs = 3 if show_middle_img else 2
+        # Display 3 images if x_init exists, otherwise 2
+        num_imgs = 3 if panel.x_init is not None else 2
         sub = gs[2, col].subgridspec(1, num_imgs, wspace=0.08)
         ax3a = fig.add_subplot(sub[0, 0])
         if num_imgs == 3:
@@ -992,14 +983,11 @@ def plot_panels(
 
         if num_imgs == 3:
             ax3b.axis("off")
-            # Use x_mdf with rank label for multi_deepfool, else x_df
-            if panel.x_mdf is not None and panel.x_mdf_rank is not None:
-                ax3b.set_title(f"x_mdf(rank={panel.x_mdf_rank})", fontsize=11, pad=6)
+            # Use x_init label (with rank on second line for multi_deepfool)
+            if panel.x_init_rank is not None:
+                ax3b.set_title(f"x_init\n(rank={panel.x_init_rank})", fontsize=10, pad=4)
             else:
-                ax3b.set_title("x_df", fontsize=11, pad=6)
-
-        # Select middle image: x_mdf (raw, no eps) if available, else x_df
-        middle_img = panel.x_mdf if panel.x_mdf is not None else panel.x_df
+                ax3b.set_title("x_init", fontsize=11, pad=6)
 
         if dataset == "mnist":
             ax3a.imshow(
@@ -1008,9 +996,9 @@ def plot_panels(
                 vmin=0.0,
                 vmax=1.0,
             )
-            if num_imgs == 3 and middle_img is not None:
+            if num_imgs == 3 and panel.x_init is not None:
                 ax3b.imshow(
-                    np.squeeze(middle_img).reshape(28, 28),
+                    np.squeeze(panel.x_init).reshape(28, 28),
                     cmap="gray",
                     vmin=0.0,
                     vmax=1.0,
@@ -1027,9 +1015,9 @@ def plot_panels(
                 vmin=0.0,
                 vmax=1.0,
             )
-            if num_imgs == 3 and middle_img is not None:
+            if num_imgs == 3 and panel.x_init is not None:
                 ax3b.imshow(
-                    np.clip(np.squeeze(middle_img).reshape(32, 32, 3), 0.0, 1.0),
+                    np.clip(np.squeeze(panel.x_init).reshape(32, 32, 3), 0.0, 1.0),
                     vmin=0.0,
                     vmax=1.0,
                 )
@@ -1335,9 +1323,8 @@ def run_one_example(
 
     log_nat_sanity(sess, ops, x_nat, y_nat)
 
-    x_df = None
-    x_mdf = None
-    x_mdf_rank = None
+    x_init = None
+    x_init_rank = None
 
     if args.init == "multi_deepfool":
         pgd = run_multi_deepfool_init_pgd(
@@ -1353,9 +1340,8 @@ def run_one_example(
             df_overshoot=float(args.df_overshoot),
             seed=int(args.seed),
         )
-        x_df = pgd.x_df_endpoints[0:1].astype(np.float32)  # DeepFool endpoint (rank 0, eps-constrained)
-        x_mdf = pgd.x_mdf_raw[np.newaxis, ...].astype(np.float32)  # Max-loss DeepFool (raw, no eps)
-        x_mdf_rank = pgd.x_mdf_rank
+        x_init = pgd.x_init[np.newaxis, ...].astype(np.float32)  # Max-loss DeepFool (eps-constrained)
+        x_init_rank = pgd.x_init_rank
     else:
         pgd = run_pgd_batch(
             sess=sess,
@@ -1369,14 +1355,14 @@ def run_one_example(
             seed=int(args.seed),
         )
 
-    # Sanity logging (x_df and x_init for multi_deepfool case)
+    # Sanity logging
     sanity = log_init_sanity(
         sess=sess,
         ops=ops,
         x_nat=x_nat,
         y_nat=y_nat,
-        x_df=x_df,
-        x_init=x_df,  # For multi_deepfool, same as x_df
+        x_df=x_init,
+        x_init=x_init,
         eps=float(args.epsilon),
     )
 
@@ -1400,9 +1386,8 @@ def run_one_example(
         pred_end=int(pred_end),
         pgd=pgd,
         sanity=sanity,
-        x_df=x_df,
-        x_mdf=x_mdf,
-        x_mdf_rank=x_mdf_rank,
+        x_init=x_init,
+        x_init_rank=x_init_rank,
         test_idx=int(idx),
     )
 

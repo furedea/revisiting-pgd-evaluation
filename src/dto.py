@@ -125,7 +125,7 @@ class InitSanityMetrics:
 class PGDBatchResult:
     """Batched PGD result for one example (R restarts)."""
 
-    __slots__ = ("losses", "preds", "corrects", "x_adv_final")
+    __slots__ = ("losses", "preds", "corrects", "x_adv_final", "x_init")
 
     def __init__(
         self,
@@ -133,11 +133,13 @@ class PGDBatchResult:
         preds: np.ndarray,
         corrects: np.ndarray,
         x_adv_final: np.ndarray,
+        x_init: Optional[np.ndarray] = None,
     ) -> None:
         self.losses = losses
         self.preds = preds
         self.corrects = corrects
         self.x_adv_final = x_adv_final
+        self.x_init = x_init
 
 
 class ExamplePanel:
@@ -146,7 +148,7 @@ class ExamplePanel:
     __slots__ = (
         "x_nat",
         "y_nat",
-        "x_df",
+        "x_init",
         "x_adv_show",
         "show_restart",
         "pred_end",
@@ -163,11 +165,11 @@ class ExamplePanel:
         pred_end: int,
         pgd: PGDBatchResult,
         sanity: Optional[InitSanityMetrics],
-        x_df: Optional[np.ndarray] = None,
+        x_init: Optional[np.ndarray] = None,
     ) -> None:
         self.x_nat = x_nat
         self.y_nat = y_nat
-        self.x_df = x_df
+        self.x_init = x_init
         self.x_adv_show = x_adv_show
         self.show_restart = show_restart
         self.pred_end = pred_end

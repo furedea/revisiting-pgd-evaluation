@@ -78,6 +78,9 @@ def run_pgd_batch(
         eps=float(eps),
     )
 
+    # Save initial point for display (first restart only)
+    x_init_save = x_adv[0:1].astype(np.float32).copy()
+
     l0, p0 = sess.run(
         [ops.per_ex_loss_op, ops.y_pred_op],
         feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch},
@@ -105,6 +108,7 @@ def run_pgd_batch(
         preds=preds,
         corrects=corrects,
         x_adv_final=x_adv.astype(np.float32),
+        x_init=x_init_save,
     )
 
 

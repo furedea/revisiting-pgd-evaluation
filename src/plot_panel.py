@@ -58,13 +58,18 @@ def plot_single_panel(
         vmax=1,
     )
     ax2.set_xlabel("PGD Iterations")
-    ax2.set_ylabel("restart (run)" if col == 0 else "")
-    ax2.set_yticks([0, restarts - 1])
-    ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
+    # Heatmap y-axis: hide for n=1, show for multiple restarts
+    if restarts == 1:
+        ax2.set_ylabel("")
+        ax2.set_yticks([])
+    else:
+        ax2.set_ylabel("restart (run)" if col == 0 else "")
+        ax2.set_yticks([0, restarts - 1])
+        ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
     ax2.tick_params(labelbottom=True)
 
-    # Display 3 images if x_df exists, otherwise 2
-    num_imgs = 3 if panel.x_df is not None else 2
+    # Display 3 images if x_init exists, otherwise 2
+    num_imgs = 3 if panel.x_init is not None else 2
     sub = gs[2, col].subgridspec(1, num_imgs, wspace=0.08)
     ax3a = fig.add_subplot(sub[0, 0])
     if num_imgs == 3:
@@ -80,7 +85,7 @@ def plot_single_panel(
 
     if num_imgs == 3:
         ax3b.axis("off")
-        ax3b.set_title("x_df", fontsize=11, pad=6)
+        ax3b.set_title("x_init", fontsize=11, pad=6)
 
     if dataset == "mnist":
         ax3a.imshow(
@@ -89,9 +94,9 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        if num_imgs == 3 and panel.x_df is not None:
+        if num_imgs == 3 and panel.x_init is not None:
             ax3b.imshow(
-                np.squeeze(panel.x_df).reshape(28, 28),
+                np.squeeze(panel.x_init).reshape(28, 28),
                 cmap="gray",
                 vmin=0.0,
                 vmax=1.0,
@@ -108,9 +113,9 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        if num_imgs == 3 and panel.x_df is not None:
+        if num_imgs == 3 and panel.x_init is not None:
             ax3b.imshow(
-                np.clip(np.squeeze(panel.x_df).reshape(32, 32, 3), 0.0, 1.0),
+                np.clip(np.squeeze(panel.x_init).reshape(32, 32, 3), 0.0, 1.0),
                 vmin=0.0,
                 vmax=1.0,
             )
