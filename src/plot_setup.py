@@ -29,12 +29,19 @@ def should_show_sanity_row(
 def create_figure_config(
     num_panels: int,
     show_sanity_row: bool,
+    num_restarts: int = 1,
 ) -> Tuple[int, List[float], float, float]:
     """Create figure configuration (nrows, height_ratios, width, height)."""
     nrows = 4 if show_sanity_row else 3
-    height_ratios = [3.2, 1.5, 1.6, 1.6] if show_sanity_row else [3.2, 1.5, 1.6]
+    # Reduce heatmap height for single restart (narrower but still visible)
+    heatmap_height = 0.7 if num_restarts == 1 else 1.5
+    height_ratios = (
+        [3.2, heatmap_height, 1.6, 1.6] if show_sanity_row else [3.2, heatmap_height, 1.6]
+    )
     fig_w = min(3.6 * num_panels, 16.0)
-    fig_h = 10.5 if nrows == 4 else 9.0
+    # Adjust figure height for single restart
+    base_h = 10.5 if nrows == 4 else 9.0
+    fig_h = base_h - 0.6 if num_restarts == 1 else base_h
     return nrows, height_ratios, fig_w, fig_h
 
 
@@ -42,12 +49,15 @@ def setup_figure(
     num_panels: int,
     title: str,
     show_sanity_row: bool,
+    num_restarts: int = 1,
 ) -> Tuple[Figure, GridSpec, int]:
     """Create and configure the main figure with gridspec."""
     if num_panels < 1 or num_panels > 5:
         raise ValueError(f"len(panels) must be 1..5, got {num_panels}")
 
-    nrows, height_ratios, fig_w, fig_h = create_figure_config(num_panels, show_sanity_row)
+    nrows, height_ratios, fig_w, fig_h = create_figure_config(
+        num_panels, show_sanity_row, num_restarts
+    )
 
     fig = plt.figure(figsize=(fig_w, fig_h))
     fig.suptitle(title, fontsize=14, y=0.995)

@@ -58,10 +58,11 @@ def plot_single_panel(
         vmax=1,
     )
     ax2.set_xlabel("PGD Iterations")
-    # Heatmap y-axis: hide for n=1, show for multiple restarts
+    # Heatmap y-axis: show label and ticks
     if restarts == 1:
-        ax2.set_ylabel("")
-        ax2.set_yticks([])
+        ax2.set_ylabel("restart (run)" if col == 0 else "")
+        ax2.set_yticks([0])
+        ax2.set_yticklabels(["0"] if col == 0 else [""])
     else:
         ax2.set_ylabel("restart (run)" if col == 0 else "")
         ax2.set_yticks([0, restarts - 1])
@@ -136,9 +137,10 @@ def plot_panels(
 ) -> None:
     """Plot all panels and save to file."""
     num_panels = int(len(panels))
+    num_restarts = int(panels[0].pgd.losses.shape[0])
     show_sanity_row = should_show_sanity_row(panels, init_sanity_plot, eps)
 
-    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row)
+    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row, num_restarts)
     add_correctness_legend(fig)
 
     for col, panel in enumerate(panels):

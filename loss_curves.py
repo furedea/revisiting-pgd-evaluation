@@ -880,15 +880,18 @@ def plot_panels(
         raise ValueError(f"len(panels) must be 1..5, got {num_panels}")
 
     cmap = ListedColormap(["#440154", "#FDE725"])
+    num_restarts = int(panels[0].pgd.losses.shape[0])
 
     # Sanity row disabled
     show_sanity_row = False
     nrows = 3
-    height_ratios = [3.2, 1.5, 1.6]
+    # Reduce heatmap height for single restart
+    heatmap_height = 0.7 if num_restarts == 1 else 1.5
+    height_ratios = [3.2, heatmap_height, 1.6]
 
-    # fig_w = 4.2 * num_panels
-    fig_w = min(3.6 * num_panels, 16.0) # TODO
-    fig_h = 10.5 if nrows == 4 else 9.0
+    fig_w = min(3.6 * num_panels, 16.0)
+    base_h = 10.5 if nrows == 4 else 9.0
+    fig_h = base_h - 0.6 if num_restarts == 1 else base_h
     fig = plt.figure(figsize=(fig_w, fig_h))
     fig.suptitle(title, fontsize=14, y=0.995)
     gs = fig.add_gridspec(
@@ -952,16 +955,15 @@ def plot_panels(
             vmax=1,
         )
         ax2.set_xlabel("Iterations")
-        # Heatmap y-axis: hide for n=1, "distance rank" for MDF, "restart (run)" otherwise
-        if restarts == 1:
-            ax2.set_ylabel("")
-            ax2.set_yticks([])
-        elif init_mode == "multi_deepfool":
+        # Heatmap y-axis: "distance rank" for MDF, "restart (run)" otherwise
+        if init_mode == "multi_deepfool":
             ax2.set_ylabel("distance rank" if col == 0 else "")
-            ax2.set_yticks([0, restarts - 1])
-            ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
         else:
             ax2.set_ylabel("restart (run)" if col == 0 else "")
+        if restarts == 1:
+            ax2.set_yticks([0])
+            ax2.set_yticklabels(["0"] if col == 0 else [""])
+        else:
             ax2.set_yticks([0, restarts - 1])
             ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
         ax2.tick_params(labelbottom=True)
