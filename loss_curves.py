@@ -880,11 +880,14 @@ def plot_panels(
         raise ValueError(f"len(panels) must be 1..5, got {num_panels}")
 
     cmap = ListedColormap(["#440154", "#FDE725"])
+    num_restarts = int(panels[0].pgd.losses.shape[0])
 
     # Sanity row disabled
     show_sanity_row = False
     nrows = 3
-    height_ratios = [3.2, 1.5, 1.6]
+    # Scale heatmap height by number of restarts (1 row = 1.5/20)
+    heatmap_height = 1.5 * num_restarts / 20.0 if num_restarts < 20 else 1.5
+    height_ratios = [3.2, heatmap_height, 1.6]
 
     fig_w = min(3.6 * num_panels, 16.0)
     fig_h = 10.5 if nrows == 4 else 9.0
