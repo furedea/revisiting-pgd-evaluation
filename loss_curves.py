@@ -1340,7 +1340,7 @@ def run_one_example(
             df_overshoot=float(args.df_overshoot),
             seed=int(args.seed),
         )
-        x_init = pgd.x_init[np.newaxis, ...].astype(np.float32)  # Max-loss DeepFool (eps-constrained)
+        x_init = pgd.x_init.astype(np.float32)  # Max-loss DeepFool (eps-constrained)
         x_init_rank = pgd.x_init_rank
     else:
         pgd = run_pgd_batch(
