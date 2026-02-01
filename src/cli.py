@@ -36,6 +36,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="clip",
         help="How to enforce Linf<=eps for deepfool-init: clip(default) | scale | maxloss",
     )
+    ap.add_argument(
+        "--common_indices_file",
+        type=str,
+        default=None,
+        help="JSON file with pre-computed common correct indices (from find_common_correct_samples.py)",
+    )
 
     return ap
 
@@ -78,5 +84,4 @@ def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
 def format_title(args: argparse.Namespace) -> str:
     """Format title for the figure."""
     tag = get_model_tag(str(args.ckpt_dir))
-    df_part = f", df_jitter={args.df_jitter}, df_project={args.df_project}" if args.init == "deepfool" else ""
-    return f"{args.dataset.upper()} loss curves ({tag}, {args.init}-init{df_part})"
+    return f"{args.dataset.upper()} {tag} {args.init}-init PGD"

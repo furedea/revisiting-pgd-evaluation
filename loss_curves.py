@@ -12,8 +12,9 @@ import sys
 import argparse
 import inspect
 import importlib.util
+import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -158,7 +159,15 @@ class InitSanityMetrics:
 class PGDBatchResult:
     """Batched PGD result for one example (R restarts)."""
 
-    __slots__ = ("losses", "preds", "corrects", "x_adv_final", "x_df_endpoints")
+    __slots__ = (
+        "losses",
+        "preds",
+        "corrects",
+        "x_adv_final",
+        "x_df_endpoints",
+        "x_mdf_raw",
+        "x_mdf_rank",
+    )
 
     def __init__(
         self,
@@ -167,12 +176,16 @@ class PGDBatchResult:
         corrects: np.ndarray,
         x_adv_final: np.ndarray,
         x_df_endpoints: Optional[np.ndarray] = None,
+        x_mdf_raw: Optional[np.ndarray] = None,
+        x_mdf_rank: Optional[int] = None,
     ) -> None:
         self.losses = losses
         self.preds = preds
         self.corrects = corrects
         self.x_adv_final = x_adv_final
         self.x_df_endpoints = x_df_endpoints
+        self.x_mdf_raw = x_mdf_raw
+        self.x_mdf_rank = x_mdf_rank
 
 
 class ExamplePanel:
@@ -182,6 +195,8 @@ class ExamplePanel:
         "x_nat",
         "y_nat",
         "x_df",
+        "x_mdf",
+        "x_mdf_rank",
         "x_adv_show",
         "show_restart",
         "pred_end",
@@ -200,11 +215,15 @@ class ExamplePanel:
         pgd: PGDBatchResult,
         sanity: Optional[InitSanityMetrics],
         x_df: Optional[np.ndarray] = None,
+        x_mdf: Optional[np.ndarray] = None,
+        x_mdf_rank: Optional[int] = None,
         test_idx: int = -1,
     ) -> None:
         self.x_nat = x_nat
         self.y_nat = y_nat
         self.x_df = x_df
+        self.x_mdf = x_mdf
+        self.x_mdf_rank = x_mdf_rank
         self.x_adv_show = x_adv_show
         self.show_restart = show_restart
         self.pred_end = pred_end
@@ -444,13 +463,14 @@ def multi_deepfool_with_trace(
     max_iter: int,
     overshoot: float,
     eps: float,
-) -> Tuple[Tuple[np.ndarray, ...], np.ndarray, np.ndarray]:
+) -> Tuple[Tuple[np.ndarray, ...], Tuple[np.ndarray, ...], np.ndarray, np.ndarray]:
     """Multi-DeepFool with trajectory recording.
 
     Records loss/pred at each iteration for each target class, clipped to eps-ball.
 
     Returns:
         x_advs: tuple of (top_k,) final adversarial examples (clipped to eps)
+        x_advs_raw: tuple of (top_k,) final adversarial examples (without eps constraint)
         losses: (top_k, max_iter+1) - loss at each iteration
         preds: (top_k, max_iter+1) - pred at each iteration
     """
@@ -502,6 +522,7 @@ def multi_deepfool_with_trace(
 
     # Generate trajectory for each target
     x_advs = []
+    x_advs_raw = []
     for idx in range(k_actual):
         _, target_class, _ = target_distances[idx]
 
@@ -541,11 +562,14 @@ def multi_deepfool_with_trace(
         x_curr = x0 + (1.0 + float(overshoot)) * (x_curr - x0)
         x_curr = clip_to_unit_interval(x_curr)
 
+        # Save raw output (without eps constraint)
+        x_advs_raw.append(x_curr.copy())
+
         # Final point (projected to eps-ball)
         x_final = clip_to_unit_interval(project_linf(x_curr, x0, float(eps)))
         x_advs.append(x_final)
 
-    return tuple(x_advs), losses, preds
+    return tuple(x_advs), tuple(x_advs_raw), losses, preds
 
 
 def run_multi_deepfool_init_pgd(
@@ -583,7 +607,7 @@ def run_multi_deepfool_init_pgd(
     preds = np.zeros((restarts, pgd_iter + 1), dtype=np.int64)
 
     # Run multi_deepfool with trace
-    x_advs, df_losses, df_preds = multi_deepfool_with_trace(
+    x_advs, x_advs_raw, df_losses, df_preds = multi_deepfool_with_trace(
         sess=sess,
         ops=ops,
         x0=x_nat,
@@ -593,6 +617,16 @@ def run_multi_deepfool_init_pgd(
         overshoot=float(df_overshoot),
         eps=float(eps),
     )
+
+    # Find max-loss x_mdf from raw outputs (without eps constraint)
+    raw_losses = []
+    for x_raw in x_advs_raw:
+        loss_val = sess.run(ops.per_ex_loss_op, feed_dict={ops.x_ph: x_raw, ops.y_ph: y_nat})
+        raw_losses.append(float(loss_val[0]))
+    x_mdf_rank = int(np.argmax(raw_losses))
+    x_mdf_raw = x_advs_raw[x_mdf_rank].astype(np.float32)
+
+    LOGGER.info(f"[multi_deepfool_pgd] x_mdf selected: rank={x_mdf_rank} loss={raw_losses[x_mdf_rank]:.6g}")
 
     # Prepare batch for PGD
     y_batch = np.repeat(y_nat.astype(np.int64), restarts, axis=0)
@@ -627,6 +661,8 @@ def run_multi_deepfool_init_pgd(
         corrects=corrects,
         x_adv_final=x_adv.astype(np.float32),
         x_df_endpoints=x_df_endpoints,
+        x_mdf_raw=x_mdf_raw,
+        x_mdf_rank=x_mdf_rank,
     )
 
 
@@ -655,6 +691,43 @@ def find_correct_indices(
 
     if len(found_indices) < int(k):
         raise RuntimeError(f"Could not find {k} correct examples (found {len(found_indices)}).")
+
+    return tuple(int(i) for i in found_indices)
+
+
+def load_common_indices(file_path: str) -> List[int]:
+    """Load pre-computed common correct indices from JSON file."""
+    with open(file_path) as f:
+        data = json.load(f)
+    return data["common_correct_indices"]
+
+
+def select_indices_from_common(
+    sess: tf.compat.v1.Session,
+    ops: ModelOps,
+    x_test: np.ndarray,
+    y_test: np.ndarray,
+    common_indices: List[int],
+    k: int,
+    start_idx: int,
+) -> Tuple[int, ...]:
+    """Select k indices from common correct indices, verifying they are correct for this model."""
+    found_indices = []
+    for idx in common_indices:
+        if idx < start_idx:
+            continue
+        x = x_test[idx : idx + 1]
+        y = y_test[idx : idx + 1]
+        pred = sess.run(ops.y_pred_op, feed_dict={ops.x_ph: x, ops.y_ph: y})
+        if int(pred[0]) == int(y.reshape(-1)[0]):
+            found_indices.append(idx)
+            if len(found_indices) >= k:
+                break
+
+    if len(found_indices) < k:
+        raise RuntimeError(
+            f"Could not find {k} correct examples from common indices (found {len(found_indices)})."
+        )
 
     return tuple(int(i) for i in found_indices)
 
@@ -887,13 +960,23 @@ def plot_panels(
             vmax=1,
         )
         ax2.set_xlabel("Iterations")
-        ax2.set_ylabel("restart (run)" if col == 0 else "")
-        ax2.set_yticks([0, restarts - 1])
-        ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
+        # Heatmap y-axis: hide for n=1, "distance rank" for MDF, "restart (run)" otherwise
+        if restarts == 1:
+            ax2.set_ylabel("")
+            ax2.set_yticks([])
+        elif init_mode == "multi_deepfool":
+            ax2.set_ylabel("distance rank" if col == 0 else "")
+            ax2.set_yticks([0, restarts - 1])
+            ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
+        else:
+            ax2.set_ylabel("restart (run)" if col == 0 else "")
+            ax2.set_yticks([0, restarts - 1])
+            ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
         ax2.tick_params(labelbottom=True)
 
-        # Display 3 images if x_df exists, otherwise 2
-        num_imgs = 3 if panel.x_df is not None else 2
+        # Display 3 images if x_df or x_mdf exists, otherwise 2
+        show_middle_img = panel.x_df is not None or panel.x_mdf is not None
+        num_imgs = 3 if show_middle_img else 2
         sub = gs[2, col].subgridspec(1, num_imgs, wspace=0.08)
         ax3a = fig.add_subplot(sub[0, 0])
         if num_imgs == 3:
@@ -909,7 +992,14 @@ def plot_panels(
 
         if num_imgs == 3:
             ax3b.axis("off")
-            ax3b.set_title("x_df", fontsize=11, pad=6)
+            # Use x_mdf with rank label for multi_deepfool, else x_df
+            if panel.x_mdf is not None and panel.x_mdf_rank is not None:
+                ax3b.set_title(f"x_mdf(rank={panel.x_mdf_rank})", fontsize=11, pad=6)
+            else:
+                ax3b.set_title("x_df", fontsize=11, pad=6)
+
+        # Select middle image: x_mdf (raw, no eps) if available, else x_df
+        middle_img = panel.x_mdf if panel.x_mdf is not None else panel.x_df
 
         if dataset == "mnist":
             ax3a.imshow(
@@ -918,9 +1008,9 @@ def plot_panels(
                 vmin=0.0,
                 vmax=1.0,
             )
-            if num_imgs == 3 and panel.x_df is not None:
+            if num_imgs == 3 and middle_img is not None:
                 ax3b.imshow(
-                    np.squeeze(panel.x_df).reshape(28, 28),
+                    np.squeeze(middle_img).reshape(28, 28),
                     cmap="gray",
                     vmin=0.0,
                     vmax=1.0,
@@ -937,9 +1027,9 @@ def plot_panels(
                 vmin=0.0,
                 vmax=1.0,
             )
-            if num_imgs == 3 and panel.x_df is not None:
+            if num_imgs == 3 and middle_img is not None:
                 ax3b.imshow(
-                    np.clip(np.squeeze(panel.x_df).reshape(32, 32, 3), 0.0, 1.0),
+                    np.clip(np.squeeze(middle_img).reshape(32, 32, 3), 0.0, 1.0),
                     vmin=0.0,
                     vmax=1.0,
                 )
@@ -1109,13 +1199,14 @@ def plot_panels(
             norm_loss = plt.Normalize(0, restarts - 1)
             sm = plt.cm.ScalarMappable(cmap=cmap_loss, norm=norm_loss)
             sm.set_array([])
-            cbar_ax = fig.add_axes([0.96, 0.55, 0.012, 0.30])
+            # Colorbar position adjusted to avoid being cut off
+            cbar_ax = fig.add_axes([0.91, 0.55, 0.015, 0.30])
             cbar = fig.colorbar(sm, cax=cbar_ax)
             cbar.set_label("Distance rank\n(0=closest)", fontsize=9)
             cbar.ax.tick_params(labelsize=8)
 
     # Adjust margins (right margin for colorbar when multi_deepfool)
-    right_margin = 0.94 if init_mode == "multi_deepfool" else 0.99
+    right_margin = 0.89 if init_mode == "multi_deepfool" else 0.99
     # Increase left margin to accommodate y-axis labels on all columns
     fig.subplots_adjust(top=0.90 if nrows == 4 else 0.88, bottom=0.11, left=0.08, right=right_margin)
     fig.savefig(out_png, dpi=200)
@@ -1153,6 +1244,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     ap.add_argument("--df_overshoot", type=float, default=0.02)
     ap.add_argument("--init_sanity_plot", action="store_true")
+    ap.add_argument(
+        "--common_indices_file",
+        type=str,
+        default=None,
+        help="JSON file with pre-computed common correct indices (from find_common_correct_samples.py)",
+    )
 
     return ap
 
@@ -1192,7 +1289,7 @@ def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
 
 def format_title(args: argparse.Namespace) -> str:
     tag = get_model_tag(str(args.ckpt_dir))
-    return f"{args.dataset.upper()} loss curves ({tag}, {args.init}-init)"
+    return f"{args.dataset.upper()} {tag} {args.init}-init PGD"
 
 
 # ============================================================
@@ -1239,6 +1336,8 @@ def run_one_example(
     log_nat_sanity(sess, ops, x_nat, y_nat)
 
     x_df = None
+    x_mdf = None
+    x_mdf_rank = None
 
     if args.init == "multi_deepfool":
         pgd = run_multi_deepfool_init_pgd(
@@ -1254,7 +1353,9 @@ def run_one_example(
             df_overshoot=float(args.df_overshoot),
             seed=int(args.seed),
         )
-        x_df = pgd.x_df_endpoints[0:1].astype(np.float32)  # DeepFool endpoint
+        x_df = pgd.x_df_endpoints[0:1].astype(np.float32)  # DeepFool endpoint (rank 0, eps-constrained)
+        x_mdf = pgd.x_mdf_raw[np.newaxis, ...].astype(np.float32)  # Max-loss DeepFool (raw, no eps)
+        x_mdf_rank = pgd.x_mdf_rank
     else:
         pgd = run_pgd_batch(
             sess=sess,
@@ -1300,6 +1401,8 @@ def run_one_example(
         pgd=pgd,
         sanity=sanity,
         x_df=x_df,
+        x_mdf=x_mdf,
+        x_mdf_rank=x_mdf_rank,
         test_idx=int(idx),
     )
 
@@ -1403,15 +1506,27 @@ def run_pipeline(args: argparse.Namespace) -> None:
         restore_checkpoint(sess, saver, str(args.ckpt_dir))
         x_test, y_test = load_test_data(args, model_src_dir)
 
-        indices = find_correct_indices(
-            sess=sess,
-            ops=ops,
-            x_test=x_test,
-            y_test=y_test,
-            k=int(args.n_examples),
-            start_idx=int(args.start_idx),
-            max_tries=int(args.max_tries),
-        )
+        if args.common_indices_file:
+            common_indices = load_common_indices(str(args.common_indices_file))
+            indices = select_indices_from_common(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                common_indices=common_indices,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+            )
+        else:
+            indices = find_correct_indices(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+                max_tries=int(args.max_tries),
+            )
         base = format_base_name(args, indices)
         title = format_title(args)
         tag = get_model_tag(str(args.ckpt_dir))

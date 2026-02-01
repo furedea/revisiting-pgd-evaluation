@@ -1,8 +1,9 @@
 """Pipeline orchestration for PGD visualization."""
 
 import argparse
+import json
 import os
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -134,6 +135,43 @@ def find_correct_indices(
 
     if len(found_indices) < int(k):
         raise RuntimeError(f"Could not find {k} correct examples (found {len(found_indices)}).")
+
+    return tuple(int(i) for i in found_indices)
+
+
+def load_common_indices(file_path: str) -> List[int]:
+    """Load pre-computed common correct indices from JSON file."""
+    with open(file_path) as f:
+        data = json.load(f)
+    return data["common_correct_indices"]
+
+
+def select_indices_from_common(
+    sess: tf.compat.v1.Session,
+    ops: ModelOps,
+    x_test: np.ndarray,
+    y_test: np.ndarray,
+    common_indices: List[int],
+    k: int,
+    start_idx: int,
+) -> Tuple[int, ...]:
+    """Select k indices from common correct indices, verifying they are correct for this model."""
+    found_indices = []
+    for idx in common_indices:
+        if idx < start_idx:
+            continue
+        x = x_test[idx : idx + 1]
+        y = y_test[idx : idx + 1]
+        pred = sess.run(ops.y_pred_op, feed_dict={ops.x_ph: x, ops.y_ph: y})
+        if int(pred[0]) == int(y.reshape(-1)[0]):
+            found_indices.append(idx)
+            if len(found_indices) >= k:
+                break
+
+    if len(found_indices) < k:
+        raise RuntimeError(
+            f"Could not find {k} correct examples from common indices (found {len(found_indices)})."
+        )
 
     return tuple(int(i) for i in found_indices)
 
@@ -323,15 +361,27 @@ def run_pipeline(args: argparse.Namespace) -> None:
         restore_checkpoint(sess, saver, str(args.ckpt_dir))
         x_test, y_test = load_test_data(str(args.dataset), model_src_dir)
 
-        indices = find_correct_indices(
-            sess=sess,
-            ops=ops,
-            x_test=x_test,
-            y_test=y_test,
-            k=int(args.n_examples),
-            start_idx=int(args.start_idx),
-            max_tries=int(args.max_tries),
-        )
+        if args.common_indices_file:
+            common_indices = load_common_indices(str(args.common_indices_file))
+            indices = select_indices_from_common(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                common_indices=common_indices,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+            )
+        else:
+            indices = find_correct_indices(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+                max_tries=int(args.max_tries),
+            )
         base = format_base_name(args, indices)
         title = format_title(args)
         tag = get_model_tag(str(args.ckpt_dir))
