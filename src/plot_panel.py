@@ -137,10 +137,9 @@ def plot_panels(
 ) -> None:
     """Plot all panels and save to file."""
     num_panels = int(len(panels))
-    num_restarts = int(panels[0].pgd.losses.shape[0])
     show_sanity_row = should_show_sanity_row(panels, init_sanity_plot, eps)
 
-    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row, num_restarts)
+    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row)
     add_correctness_legend(fig)
 
     for col, panel in enumerate(panels):
