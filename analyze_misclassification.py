@@ -669,7 +669,7 @@ def plot_misclassification_cdf_overlay(
     dataset: str,
 ) -> None:
     """Plot CDF overlay comparing all inits on one figure."""
-    fig, ax = plt.subplots(figsize=(14, 10))
+    fig, ax = plt.subplots(figsize=(16, 14))
 
     markers = {"nat": "o", "nat_and_adv": "s", "adv": "^", "weak_adv": "D"}
     # Line widths by model (nat thickest, adv thinnest)
@@ -809,7 +809,7 @@ def plot_misclassification_cdf_overlay(
         )
 
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.30)
+    plt.subplots_adjust(bottom=0.22)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[SAVE] Misclassification CDF overlay: {out_path}")
