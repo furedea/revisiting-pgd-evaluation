@@ -20,13 +20,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_nat_and_adv_random_indices0-1-2-3-4_k100_eps0.3_a0.01_r20_seed0.png}
-  \caption{MNIST nat\_and\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回のリスタートを実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像と敵対的サンプル．}
+  \caption{MNIST nat\_and\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回の試行を実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像，ランダム初期化サンプル，敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_weak_adv_random_indices0-1-2-3-4_k100_eps0.3_a0.01_r20_seed0.png}
-  \caption{MNIST weak\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回のリスタートを実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像と敵対的サンプル．}
+  \caption{MNIST weak\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回の試行を実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像，ランダム初期化サンプル，敵対的サンプル．}
 \end{figure}
 
 \subsection{CIFAR10}
@@ -34,13 +34,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_nat_and_adv_random_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r20_seed0.png}
-  \caption{CIFAR10 nat\_and\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回のリスタートを実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像と敵対的サンプル．}
+  \caption{CIFAR10 nat\_and\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回の試行を実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像，ランダム初期化サンプル，敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_weak_adv_random_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r20_seed0.png}
-  \caption{CIFAR10 weak\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回のリスタートを実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像と敵対的サンプル．}
+  \caption{CIFAR10 weak\_advモデルに対するランダム初期化PGDの損失曲線．5つのテストサンプルに対し，各20回の試行を実行．上段：損失曲線，中段：正誤ヒートマップ，下段：元画像，ランダム初期化サンプル，敵対的サンプル．}
 \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -51,13 +51,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_nat_and_adv_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
-  \caption{MNIST nat\_and\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool結果，最終敵対的サンプル．}
+  \caption{MNIST nat\_and\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_weak_adv_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
-  \caption{MNIST weak\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool結果，最終敵対的サンプル．}
+  \caption{MNIST weak\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \subsection{CIFAR10}
@@ -65,13 +65,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_nat_and_adv_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
-  \caption{CIFAR10 nat\_and\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool結果，最終敵対的サンプル．}
+  \caption{CIFAR10 nat\_and\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_weak_adv_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r1_seed0_dfiter50_dfo0.02_dfj0.0_dfproject_clip.png}
-  \caption{CIFAR10 weak\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool結果，最終敵対的サンプル．}
+  \caption{CIFAR10 weak\_advモデルに対するDeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，DeepFool初期点からPGD攻撃を実行．上段：損失曲線，下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -82,13 +82,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_nat_and_adv_multi_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r9_seed0_dfiter50_dfo0.02.png}
-  \caption{MNIST nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，最近傍ターゲットへのDeepFool結果，最終敵対的サンプル．}
+  \caption{MNIST nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/mnist_weak_adv_multi_deepfool_indices0-1-2-3-4_k100_eps0.3_a0.01_r9_seed0_dfiter50_dfo0.02.png}
-  \caption{MNIST weak\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，最近傍ターゲットへのDeepFool結果，最終敵対的サンプル．}
+  \caption{MNIST weak\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \subsection{CIFAR10}
@@ -96,13 +96,13 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_nat_and_adv_multi_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r9_seed0_dfiter50_dfo0.02.png}
-  \caption{CIFAR10 nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，最近傍ターゲットへのDeepFool結果，最終敵対的サンプル．}
+  \caption{CIFAR10 nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures_ex5/figures/run_all/cifar10_weak_adv_multi_deepfool_indices0-1-2-3-4_k100_eps0.03137254901960784_a0.00784313725490196_r9_seed0_dfiter50_dfo0.02.png}
-  \caption{CIFAR10 weak\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，最近傍ターゲットへのDeepFool結果，最終敵対的サンプル．}
+  \caption{CIFAR10 weak\_advモデルに対するMulti-DeepFool初期化PGDの損失曲線．5つのテストサンプルに対し，9つのターゲットクラスへのDeepFool初期点からPGD攻撃を実行．上段：損失曲線（9本），中段：正誤ヒートマップ，下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプル．}
 \end{figure}
 
 \end{document}

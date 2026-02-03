@@ -20,7 +20,7 @@ PGD攻撃の新たな初期化手法として，DeepFoolの境界情報を用い
 
 主な知見として以下が得られた：
 \begin{itemize}
-    \item 脆弱なモデル（nat, weak\_adv）に対しては，DeepFool初期化により反復0で誤分類を達成可能
+    \item 脆弱なモデル（nat, weak\_adv）に対しては，DeepFool初期化によりランダム初期化よりも少ない反復で誤分類を達成可能
     \item 堅牢なモデル（adv, MNIST nat\_and\_adv）に対しては，どの初期化手法を用いても100反復以内に誤分類を達成できない
     \item DeepFool初期化の効果は，$\ell_\infty$制約内で決定境界を超えられるかどうかに依存する
 \end{itemize}
@@ -42,6 +42,6 @@ PGD攻撃の新たな初期化手法として，DeepFoolの境界情報を用い
     \item \textbf{他のデータセット・モデルへの適用}：ImageNetなどのより大規模なデータセットや，異なるアーキテクチャのモデルへの適用可能性を検証する
     \item \textbf{他の攻撃手法との比較}：AutoAttackやCW攻撃など，他の強力な攻撃手法との誤分類速度比較を行う
     \item \textbf{堅牢なモデルへの攻撃}：100反復で誤分類を達成できなかったモデル（MNIST adv, nat\_and\_adv，CIFAR10 adv）に対して，より長い反復回数や他の攻撃手法を用いた検証を行う
+    \item \textbf{制約適用による損失低下の改善}：DeepFool初期化の制約適用による誤分類成功率低下を改善する手法の検討
     \item \textbf{計算効率の改善}：DeepFool初期化の計算コストを削減しつつ，誤分類高速化の効果を維持する手法の検討
 \end{itemize}
-
