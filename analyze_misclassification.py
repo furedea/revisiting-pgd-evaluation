@@ -450,7 +450,7 @@ def generate_latex_table(
             else:
                 lines.append(
                     f"    {model_col} & {INIT_DISPLAY[init]} & {restart_count} & "
-                    f"{attack_rate_pct:.0f}\\% & N/A & N/A & N/A \\\\"
+                    f"{attack_rate_pct:.0f}\\% & --- & --- & --- \\\\"
                 )
 
         lines.append("    \\hline")
@@ -505,7 +505,7 @@ def print_summary(
             else:
                 print(
                     f"{model:<15} {init:<15} {restart_count:<10} {attack_rate_pct:<10.0f} "
-                    f"{'N/A':<8} {'N/A':<8} {'N/A':<8}"
+                    f"{'---':<8} {'---':<8} {'---':<8}"
                 )
 
 
