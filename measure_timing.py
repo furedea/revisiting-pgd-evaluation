@@ -107,8 +107,14 @@ class ModelOps:
         per_ex_loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=y_ph, logits=logits
         )
-        grad_op = tf.gradients(per_ex_loss_op, x_ph)[0]
-        grads_all_op = tf.gradients(logits, x_ph)
+        loss_sum = tf.reduce_sum(per_ex_loss_op)
+        grad_op = tf.gradients(loss_sum, x_ph)[0]
+
+        num_classes = int(logits.shape[-1])
+        grads_k = []
+        for k in range(num_classes):
+            grads_k.append(tf.gradients(logits[:, k], x_ph)[0])
+        grads_all_op = tf.stack(grads_k, axis=1)
 
         return cls(
             x_ph=x_ph, y_ph=y_ph, logits=logits,

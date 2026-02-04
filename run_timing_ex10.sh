@@ -98,13 +98,7 @@ for MODEL in nat adv nat_and_adv weak_adv; do
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 done
 
-# ==================================================================
-# Analyze results
-# ==================================================================
-echo "=================================================================="
-echo "[ANALYZE] Running analyze_timing.py"
-echo "=================================================================="
-run "analyze_timing.py" "analyze_timing" \
-  --input_dir "${OUT_DIR}/timing/${EXP_NAME}" --out_dir "$OUT_DIR"
-
 echo "ALL DONE."
+echo ""
+echo "To analyze results, run:"
+echo "  python analyze_timing.py --input_dir ${OUT_DIR}/timing/${EXP_NAME} --out_dir ${OUT_DIR}"
