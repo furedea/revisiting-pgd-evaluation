@@ -1259,17 +1259,12 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 
-def format_indices_part(indices: Tuple[int, ...]) -> str:
-    return f"idx{indices[0]}" if len(indices) == 1 else f"indices{'-'.join(str(i) for i in indices)}"
-
-
 def get_model_tag(ckpt_dir: str) -> str:
     """Extract model tag from ckpt_dir basename (e.g., 'models/nat' -> 'nat')."""
     return os.path.basename(os.path.normpath(ckpt_dir))
 
 
 def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
-    idx_part = format_indices_part(indices)
     tag = get_model_tag(str(args.ckpt_dir))
     df_part = (
         f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}"
@@ -1277,11 +1272,7 @@ def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
         else ""
     )
 
-    return (
-        f"{args.dataset}_{tag}_{args.init}_{idx_part}_k{args.total_iter}"
-        f"_eps{args.epsilon}_a{args.alpha}_r{args.num_restarts}_seed{args.seed}"
-        f"{df_part}"
-    )
+    return f"{args.dataset}_{tag}_{args.init}{df_part}"
 
 
 def format_title(args: argparse.Namespace) -> str:

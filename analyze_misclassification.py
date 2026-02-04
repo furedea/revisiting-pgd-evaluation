@@ -420,9 +420,9 @@ def generate_latex_table(
     lines.append("  \\small")
     lines.append("  \\begin{tabular}{l|l|c|cccc}")
     lines.append("    \\hline")
-    lines.append("    & & & & \\multicolumn{3}{c}{誤分類到達反復数} \\\\")
+    lines.append("    & & & & \\multicolumn{3}{c}{誤分類達成反復数} \\\\")
     lines.append("    \\cline{5-7}")
-    lines.append("    モデル & 初期化 & リスタート数 & 攻撃成功率 & 平均 & 中央値 & P95 \\\\")
+    lines.append("    モデル & 初期化 & リスタート数 & 誤分類達成率 & 平均 & 中央値 & P95 \\\\")
     lines.append("    \\hline")
 
     for model in MODEL_ORDER:

@@ -64,26 +64,16 @@ def get_model_tag(ckpt_dir: str) -> str:
     return os.path.basename(os.path.normpath(ckpt_dir))
 
 
-def format_indices_part(indices: Tuple[int, ...]) -> str:
-    """Format indices for file naming."""
-    return f"idx{indices[0]}" if len(indices) == 1 else f"indices{'-'.join(str(i) for i in indices)}"
-
-
 def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
     """Format base name for output files."""
-    idx_part = format_indices_part(indices)
     tag = get_model_tag(str(args.ckpt_dir))
     df_part = (
-        f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}_dfj{args.df_jitter}_dfproject_{args.df_project}"
+        f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}"
         if args.init == "deepfool"
         else ""
     )
 
-    return (
-        f"{args.dataset}_{tag}_{args.init}_{idx_part}_k{args.total_iter}"
-        f"_eps{args.epsilon}_a{args.alpha}_r{args.num_restarts}_seed{args.seed}"
-        f"{df_part}"
-    )
+    return f"{args.dataset}_{tag}_{args.init}{df_part}"
 
 
 def format_title(args: argparse.Namespace) -> str:
