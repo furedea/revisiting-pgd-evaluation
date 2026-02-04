@@ -126,7 +126,7 @@ def load_test_data(dataset: str, model_src_dir: str) -> Tuple[np.ndarray, np.nda
         from tensorflow.examples.tutorials.mnist import input_data
         data_dir = os.path.join(model_src_dir, "data")
         mnist = input_data.read_data_sets(data_dir, one_hot=False)
-        x_test = mnist.test.images.reshape(-1, 28, 28, 1).astype(np.float32)
+        x_test = mnist.test.images.astype(np.float32)  # (?, 784) flattened
         y_test = mnist.test.labels.astype(np.int64)
     else:  # cifar10
         from tensorflow.keras.datasets import cifar10
