@@ -289,6 +289,7 @@ def save_all_outputs(
             dataset=str(args.dataset),
             panel_index=int(i),
             panel=panel,
+            no_png=bool(args.no_png),
         )
 
     # Save unified metadata file

@@ -60,11 +60,12 @@ def find_common_correct_indices(
     models: List[str],
     num_classes: int = 10,
     samples_per_class: int = 1,
+    seed: int = 0,
 ) -> List[int]:
     """Find samples per class that are correctly classified by all models.
 
-    For each class (0 to num_classes-1), scan from the beginning of the test set
-    and select the first N samples that all models classify correctly.
+    For each class (0 to num_classes-1), randomly select N samples
+    from those that all models classify correctly.
     """
     x_test, y_test = load_test_data(dataset, model_src_dir)
 
@@ -86,19 +87,23 @@ def find_common_correct_indices(
         common_indices = common_indices.intersection(correct_indices)
         print(f"  Common so far: {len(common_indices)}")
 
-    # Select samples per class (first ones found when scanning from the beginning)
+    # Randomly select samples per class
+    rng = np.random.RandomState(seed)
     selected_indices: List[int] = []
+
     for class_label in range(num_classes):
-        count = 0
-        for idx in range(len(y_test)):
-            if y_test[idx] == class_label and idx in common_indices:
-                selected_indices.append(idx)
-                print(f"  Class {class_label}: selected index {idx}")
-                count += 1
-                if count >= samples_per_class:
-                    break
-        if count < samples_per_class:
-            print(f"  Warning: Only found {count}/{samples_per_class} samples for class {class_label}")
+        # Get all valid indices for this class
+        class_indices = [idx for idx in common_indices if y_test[idx] == class_label]
+
+        if len(class_indices) >= samples_per_class:
+            # Randomly select without replacement
+            chosen = rng.choice(class_indices, size=samples_per_class, replace=False)
+            selected_indices.extend(chosen.tolist())
+            print(f"  Class {class_label}: randomly selected {samples_per_class} from {len(class_indices)} candidates")
+        else:
+            # Not enough samples, take all available
+            selected_indices.extend(class_indices)
+            print(f"  Warning: Class {class_label} only has {len(class_indices)}/{samples_per_class} samples")
 
     return selected_indices
 
@@ -130,6 +135,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of samples to select per class (default: 1)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for sample selection (default: 0)",
+    )
     return parser
 
 
@@ -142,6 +153,7 @@ def main() -> None:
     out_dir = str(args.out_dir)
     models = [m.strip() for m in str(args.models).split(",")]
     samples_per_class = int(args.samples_per_class)
+    seed = int(args.seed)
     num_classes = 10
 
     if dataset == "mnist":
@@ -152,6 +164,7 @@ def main() -> None:
     print(f"Finding common correct indices for {dataset}")
     print(f"Models: {models}")
     print(f"Samples per class: {samples_per_class}")
+    print(f"Seed: {seed}")
 
     selected_indices = find_common_correct_indices(
         dataset=dataset,
@@ -159,6 +172,7 @@ def main() -> None:
         models=models,
         num_classes=num_classes,
         samples_per_class=samples_per_class,
+        seed=seed,
     )
 
     os.makedirs(out_dir, exist_ok=True)
@@ -171,6 +185,7 @@ def main() -> None:
         "selected_indices": selected_indices,
         "num_classes": num_classes,
         "samples_per_class": samples_per_class,
+        "seed": seed,
         "total_count": len(selected_indices),
     }
 

@@ -124,7 +124,9 @@ def save_panel_outputs(
     dataset: str,
     panel_index: int,
     panel: ExamplePanel,
+    no_png: bool = False,
 ) -> None:
     """Save panel arrays and images to subdirectories."""
     save_panel_arrays(out_dir, exp_name, base, panel_index, panel)
-    save_panel_images(out_dir, exp_name, base, dataset, panel_index, panel)
+    if not no_png:
+        save_panel_images(out_dir, exp_name, base, dataset, panel_index, panel)
