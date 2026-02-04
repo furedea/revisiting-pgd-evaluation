@@ -51,6 +51,19 @@ MNIST_INDICES_FILE="docs/common_correct_indices_mnist_n10.json"
 CIFAR10_INDICES_FILE="docs/common_correct_indices_cifar10_n10.json"
 
 # ==================================================================
+# Generate common correct indices (if not exists)
+# ==================================================================
+if [ ! -f "$MNIST_INDICES_FILE" ]; then
+  echo "Generating MNIST indices..."
+  $PYTHON find_common_correct_samples.py --dataset mnist --samples_per_class 1
+fi
+
+if [ ! -f "$CIFAR10_INDICES_FILE" ]; then
+  echo "Generating CIFAR10 indices..."
+  $PYTHON find_common_correct_samples.py --dataset cifar10 --samples_per_class 1
+fi
+
+# ==================================================================
 # src/main.py: random init
 # ==================================================================
 run "src/main.py" "src_mnist_nat_random" \
