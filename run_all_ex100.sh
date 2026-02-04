@@ -55,12 +55,12 @@ CIFAR10_INDICES_FILE="docs/common_correct_indices_cifar10_n100.json"
 # ==================================================================
 if [ ! -f "$MNIST_INDICES_FILE" ]; then
   echo "Generating MNIST indices..."
-  $PYTHON find_common_correct_samples.py --dataset mnist --samples_per_class 10
+  $PYTHON find_common_correct_samples.py --dataset mnist --samples_per_class 10 --seed 0
 fi
 
 if [ ! -f "$CIFAR10_INDICES_FILE" ]; then
   echo "Generating CIFAR10 indices..."
-  $PYTHON find_common_correct_samples.py --dataset cifar10 --samples_per_class 10
+  $PYTHON find_common_correct_samples.py --dataset cifar10 --samples_per_class 10 --seed 0
 fi
 
 # ==================================================================
