@@ -3,8 +3,8 @@ Misclassification analysis for PGD attacks with multiple samples.
 
 Generates:
 1. Heatmap: X-axis = PGD iterations, Y-axis = model/init combinations,
-   Color = fraction of trials misclassified by that iteration
-2. Table: LaTeX table with mean statistics across all samples
+   Color = fraction of trials misclassified at that iteration (averaged over samples)
+2. Table: LaTeX table with mean statistics averaged over samples
 
 Usage:
     python analyze_misclassification.py --input_dir outputs/arrays/run_all_ex10/ --out_dir outputs
@@ -13,6 +13,7 @@ Usage:
 import argparse
 import os
 import re
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
@@ -76,6 +77,16 @@ class CorrectsData:
     @property
     def num_iterations(self) -> int:
         return self.corrects.shape[1] - 1
+
+
+@dataclass
+class SampleStats:
+    """Statistics for a single sample."""
+    attack_success_rate: float
+    mean: Optional[float]
+    median: Optional[float]
+    p95: Optional[float]
+    misclassification_rates: np.ndarray  # shape: (max_iter+1,)
 
 
 def parse_filename(filepath: str) -> Optional[Tuple[str, str, str, int]]:
@@ -177,16 +188,57 @@ def compute_first_misclassification(corrects: np.ndarray) -> np.ndarray:
     return first_wrong_iter
 
 
-def aggregate_all_trials(
-    data_list: List[CorrectsData],
-) -> Dict[str, Dict[str, Dict[str, np.ndarray]]]:
-    """Aggregate all trials by dataset, model, and init.
+def compute_sample_stats(corrects: np.ndarray, max_iter: int = 100) -> SampleStats:
+    """Compute statistics for a single sample.
+
+    Args:
+        corrects: shape (restarts, iterations+1)
+        max_iter: maximum iteration number
 
     Returns:
-        result[dataset][model][init] = array of first misclassification iterations
-            (flattened across all samples and restarts)
+        SampleStats with attack_success_rate, mean, median, p95, and misclassification_rates
     """
-    result: Dict[str, Dict[str, Dict[str, List[int]]]] = {}
+    first_wrong = compute_first_misclassification(corrects)
+    n_total = len(first_wrong)
+    misclassified = first_wrong[first_wrong >= 0]
+    n_misclassified = len(misclassified)
+
+    attack_success_rate = n_misclassified / n_total if n_total > 0 else 0.0
+
+    if n_misclassified > 0:
+        mean = float(np.mean(misclassified))
+        median = float(np.median(misclassified))
+        p95 = float(np.percentile(misclassified, 95))
+    else:
+        mean = None
+        median = None
+        p95 = None
+
+    # Compute misclassification rate at each iteration
+    rates = np.zeros(max_iter + 1)
+    for t in range(max_iter + 1):
+        n_wrong_at_t = np.sum((first_wrong >= 0) & (first_wrong <= t))
+        rates[t] = n_wrong_at_t / n_total if n_total > 0 else 0.0
+
+    return SampleStats(
+        attack_success_rate=attack_success_rate,
+        mean=mean,
+        median=median,
+        p95=p95,
+        misclassification_rates=rates,
+    )
+
+
+def aggregate_by_sample(
+    data_list: List[CorrectsData],
+    max_iter: int = 100,
+) -> Dict[str, Dict[str, Dict[str, List[SampleStats]]]]:
+    """Aggregate statistics by sample for each dataset/model/init.
+
+    Returns:
+        result[dataset][model][init] = list of SampleStats (one per sample)
+    """
+    result: Dict[str, Dict[str, Dict[str, List[SampleStats]]]] = {}
 
     for data in data_list:
         if data.dataset not in result:
@@ -196,62 +248,94 @@ def aggregate_all_trials(
         if data.init not in result[data.dataset][data.model]:
             result[data.dataset][data.model][data.init] = []
 
-        first_wrong = compute_first_misclassification(data.corrects)
-        result[data.dataset][data.model][data.init].extend(first_wrong.tolist())
+        sample_stats = compute_sample_stats(data.corrects, max_iter)
+        result[data.dataset][data.model][data.init].append(sample_stats)
 
-    # Convert to numpy arrays
-    final: Dict[str, Dict[str, Dict[str, np.ndarray]]] = {}
-    for dataset in result:
-        final[dataset] = {}
-        for model in result[dataset]:
-            final[dataset][model] = {}
-            for init in result[dataset][model]:
-                final[dataset][model][init] = np.array(result[dataset][model][init])
-
-    return final
+    return result
 
 
-def compute_cumulative_misclassification_rate(
-    first_wrong_iters: np.ndarray,
-    max_iter: int = 100,
-) -> np.ndarray:
-    """Compute cumulative misclassification rate at each iteration.
+@dataclass
+class AveragedStats:
+    """Statistics averaged over multiple samples."""
+    attack_success_rate: float
+    mean: Optional[float]
+    median: Optional[float]
+    p95: Optional[float]
+    misclassification_rates: np.ndarray  # shape: (max_iter+1,)
+    n_samples: int
 
-    Args:
-        first_wrong_iters: array of first misclassification iterations
-            (-1 means never misclassified)
-        max_iter: maximum iteration number
 
-    Returns:
-        rates: array of shape (max_iter+1,) with cumulative misclassification rate
-            at each iteration (0 to max_iter)
+def average_sample_stats(sample_stats_list: List[SampleStats]) -> AveragedStats:
+    """Average statistics over multiple samples.
+
+    For numeric stats (mean, median, p95), average only over samples where attack succeeded.
     """
-    n_total = len(first_wrong_iters)
-    if n_total == 0:
-        return np.zeros(max_iter + 1)
+    n_samples = len(sample_stats_list)
+    if n_samples == 0:
+        return AveragedStats(
+            attack_success_rate=0.0,
+            mean=None,
+            median=None,
+            p95=None,
+            misclassification_rates=np.zeros(101),
+            n_samples=0,
+        )
 
-    rates = np.zeros(max_iter + 1)
-    for t in range(max_iter + 1):
-        # Count trials that have misclassified by iteration t
-        n_misclassified = np.sum((first_wrong_iters >= 0) & (first_wrong_iters <= t))
-        rates[t] = n_misclassified / n_total
+    # Average attack success rate
+    attack_success_rate = np.mean([s.attack_success_rate for s in sample_stats_list])
 
-    return rates
+    # Average numeric stats (only from samples with successful attacks)
+    means = [s.mean for s in sample_stats_list if s.mean is not None]
+    medians = [s.median for s in sample_stats_list if s.median is not None]
+    p95s = [s.p95 for s in sample_stats_list if s.p95 is not None]
+
+    avg_mean = float(np.mean(means)) if means else None
+    avg_median = float(np.mean(medians)) if medians else None
+    avg_p95 = float(np.mean(p95s)) if p95s else None
+
+    # Average misclassification rates
+    all_rates = np.array([s.misclassification_rates for s in sample_stats_list])
+    avg_rates = np.mean(all_rates, axis=0)
+
+    return AveragedStats(
+        attack_success_rate=attack_success_rate,
+        mean=avg_mean,
+        median=avg_median,
+        p95=avg_p95,
+        misclassification_rates=avg_rates,
+        n_samples=n_samples,
+    )
+
+
+def compute_averaged_stats(
+    sample_stats: Dict[str, Dict[str, Dict[str, List[SampleStats]]]],
+) -> Dict[str, Dict[str, Dict[str, AveragedStats]]]:
+    """Compute averaged statistics for each dataset/model/init."""
+    result: Dict[str, Dict[str, Dict[str, AveragedStats]]] = {}
+
+    for dataset in sample_stats:
+        result[dataset] = {}
+        for model in sample_stats[dataset]:
+            result[dataset][model] = {}
+            for init in sample_stats[dataset][model]:
+                stats_list = sample_stats[dataset][model][init]
+                result[dataset][model][init] = average_sample_stats(stats_list)
+
+    return result
 
 
 def plot_heatmap(
-    stats: Dict[str, Dict[str, np.ndarray]],
+    stats: Dict[str, Dict[str, AveragedStats]],
     out_path: str,
     dataset: str,
     max_iter: int = 100,
 ) -> None:
-    """Plot heatmap of cumulative misclassification rate.
+    """Plot heatmap of misclassification rate (averaged over samples).
 
     X-axis: PGD iterations (0 to max_iter)
     Y-axis: model/init combinations
-    Color: fraction of trials misclassified by that iteration
+    Color: fraction of trials misclassified at that iteration
     """
-    # Build row order: model/init combinations
     row_labels = []
     row_data = []
 
@@ -261,44 +345,37 @@ def plot_heatmap(
         for init in INIT_ORDER:
             if init not in stats[model]:
                 continue
-            first_wrong = stats[model][init]
-            rates = compute_cumulative_misclassification_rate(first_wrong, max_iter)
+            avg_stats = stats[model][init]
             row_labels.append(f"{model}/{init}")
-            row_data.append(rates)
+            row_data.append(avg_stats.misclassification_rates)
 
     if not row_data:
         print(f"[WARN] No data for heatmap: {dataset}")
         return
 
-    # Create heatmap matrix
-    heatmap_matrix = np.array(row_data)  # shape: (n_rows, max_iter+1)
+    heatmap_matrix = np.array(row_data)
 
-    # Plot
     fig, ax = plt.subplots(figsize=(14, len(row_labels) * 0.5 + 2))
 
     im = ax.imshow(
         heatmap_matrix,
         aspect="auto",
-        cmap="RdYlGn_r",  # Red = high misclassification, Green = low
+        cmap="RdYlGn_r",
         vmin=0,
         vmax=1,
         interpolation="nearest",
     )
 
-    # Colorbar
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-    cbar.set_label("Cumulative Misclassification Rate", fontsize=12)
+    cbar.set_label("Misclassification Rate (10-sample avg)", fontsize=12)
 
-    # Axis labels
     ax.set_xlabel("PGD Iteration", fontsize=12)
     ax.set_ylabel("Model / Init", fontsize=12)
-    ax.set_title(f"Misclassification Heatmap ({dataset.upper()})", fontsize=14)
+    ax.set_title(f"Misclassification Heatmap ({dataset.upper()}, 10-sample average)", fontsize=14)
 
-    # Y-axis ticks
     ax.set_yticks(range(len(row_labels)))
     ax.set_yticklabels(row_labels, fontsize=10)
 
-    # X-axis ticks (every 10 iterations)
     x_ticks = list(range(0, max_iter + 1, 10))
     ax.set_xticks(x_ticks)
     ax.set_xticklabels([str(x) for x in x_ticks], fontsize=10)
@@ -310,14 +387,11 @@ def plot_heatmap(
 
 
 def generate_latex_table(
-    stats: Dict[str, Dict[str, np.ndarray]],
+    stats: Dict[str, Dict[str, AveragedStats]],
     dataset: str,
     n_samples: int,
 ) -> str:
-    """Generate LaTeX table with misclassification statistics.
-
-    Format matches the thesis table format.
-    """
+    """Generate LaTeX table with misclassification statistics (averaged over samples)."""
     lines = []
     lines.append("\\begin{table}[H]")
     lines.append(f"  \\caption{{{dataset.upper()}における誤分類統計（{n_samples}サンプル平均）}}")
@@ -326,7 +400,7 @@ def generate_latex_table(
     lines.append("  \\small")
     lines.append("  \\begin{tabular}{l|l|c|cccc}")
     lines.append("    \\hline")
-    lines.append("    & & & & \\multicolumn{3}{c}{初回誤分類反復数} \\\\")
+    lines.append("    & & & & \\multicolumn{3}{c}{誤分類到達反復数} \\\\")
     lines.append("    \\cline{5-7}")
     lines.append("    モデル & 初期化 & リスタート数 & 攻撃成功率 & 平均 & 中央値 & P95 \\\\")
     lines.append("    \\hline")
@@ -340,28 +414,23 @@ def generate_latex_table(
             if init not in stats[model]:
                 continue
 
-            first_wrong = stats[model][init]
-            n_total = len(first_wrong)
-            misclassified = first_wrong[first_wrong >= 0]
-            n_misclassified = len(misclassified)
-            attack_rate = n_misclassified / n_total * 100 if n_total > 0 else 0
+            avg_stats = stats[model][init]
             restart_count = RESTART_COUNTS.get(init, 1)
 
             model_col = f"\\multirow{{4}}{{*}}{{{MODEL_DISPLAY[model]}}}" if first_model else ""
             first_model = False
 
-            if n_misclassified > 0:
-                mean_val = np.mean(misclassified)
-                median_val = np.median(misclassified)
-                p95_val = np.percentile(misclassified, 95)
+            attack_rate_pct = avg_stats.attack_success_rate * 100
+
+            if avg_stats.mean is not None:
                 lines.append(
                     f"    {model_col} & {INIT_DISPLAY[init]} & {restart_count} & "
-                    f"{attack_rate:.0f}\\% & {mean_val:.1f} & {median_val:.1f} & {p95_val:.1f} \\\\"
+                    f"{attack_rate_pct:.0f}\\% & {avg_stats.mean:.1f} & {avg_stats.median:.1f} & {avg_stats.p95:.1f} \\\\"
                 )
             else:
                 lines.append(
                     f"    {model_col} & {INIT_DISPLAY[init]} & {restart_count} & "
-                    f"{attack_rate:.0f}\\% & N/A & N/A & N/A \\\\"
+                    f"{attack_rate_pct:.0f}\\% & N/A & N/A & N/A \\\\"
                 )
 
         lines.append("    \\hline")
@@ -373,7 +442,7 @@ def generate_latex_table(
 
 
 def save_latex_table(
-    stats: Dict[str, Dict[str, np.ndarray]],
+    stats: Dict[str, Dict[str, AveragedStats]],
     out_path: str,
     dataset: str,
     n_samples: int,
@@ -386,13 +455,13 @@ def save_latex_table(
 
 
 def print_summary(
-    stats: Dict[str, Dict[str, np.ndarray]],
+    stats: Dict[str, Dict[str, AveragedStats]],
     dataset: str,
     n_samples: int,
 ) -> None:
     """Print summary statistics to console."""
     print(f"\n{'=' * 80}")
-    print(f"Dataset: {dataset.upper()} ({n_samples} samples)")
+    print(f"Dataset: {dataset.upper()} ({n_samples} samples, averaged)")
     print(f"{'=' * 80}")
     print(f"{'Model':<15} {'Init':<15} {'Restarts':<10} {'Success%':<10} {'Mean':<8} {'Median':<8} {'P95':<8}")
     print("-" * 80)
@@ -404,24 +473,18 @@ def print_summary(
             if init not in stats[model]:
                 continue
 
-            first_wrong = stats[model][init]
-            n_total = len(first_wrong)
-            misclassified = first_wrong[first_wrong >= 0]
-            n_misclassified = len(misclassified)
-            attack_rate = n_misclassified / n_total * 100 if n_total > 0 else 0
+            avg_stats = stats[model][init]
             restart_count = RESTART_COUNTS.get(init, 1)
+            attack_rate_pct = avg_stats.attack_success_rate * 100
 
-            if n_misclassified > 0:
-                mean_val = np.mean(misclassified)
-                median_val = np.median(misclassified)
-                p95_val = np.percentile(misclassified, 95)
+            if avg_stats.mean is not None:
                 print(
-                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate:<10.0f} "
-                    f"{mean_val:<8.1f} {median_val:<8.1f} {p95_val:<8.1f}"
+                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate_pct:<10.0f} "
+                    f"{avg_stats.mean:<8.1f} {avg_stats.median:<8.1f} {avg_stats.p95:<8.1f}"
                 )
             else:
                 print(
-                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate:<10.0f} "
+                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate_pct:<10.0f} "
                     f"{'N/A':<8} {'N/A':<8} {'N/A':<8}"
                 )
 
@@ -452,22 +515,25 @@ def main() -> None:
         print("[ERROR] No corrects files found")
         return
 
-    # Aggregate all trials
-    all_stats = aggregate_all_trials(data_list)
+    # Aggregate by sample first
+    sample_stats = aggregate_by_sample(data_list)
 
-    datasets = sorted(all_stats.keys())
+    # Compute averaged statistics
+    averaged_stats = compute_averaged_stats(sample_stats)
+
+    datasets = sorted(averaged_stats.keys())
 
     for dataset in datasets:
-        stats = all_stats[dataset]
+        stats = averaged_stats[dataset]
 
-        # Count unique samples (panel indices)
+        # Count unique samples
         dataset_data = [d for d in data_list if d.dataset == dataset]
         n_samples = len(set(d.panel_index for d in dataset_data))
 
         # Print summary
         print_summary(stats, dataset, n_samples)
 
-        # Create output directory for this dataset
+        # Create output directory
         dataset_dir = os.path.join(result_dir, dataset)
         os.makedirs(dataset_dir, exist_ok=True)
 
