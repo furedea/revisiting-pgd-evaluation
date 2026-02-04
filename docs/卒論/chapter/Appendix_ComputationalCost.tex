@@ -1,92 +1,132 @@
 \appendix
 
-\chapter{計算コストの分析}
+\chapter{実行時間の計測}
 \label{appendix:computational_cost}
 
-本付録では，提案手法(DeepFool初期化，Multi-DeepFool初期化)の計算コストを分析し，ランダム初期化との比較を行う．計算コストの尺度として勾配計算の回数を用いる．これは，敵対的攻撃における計算時間の大部分が勾配計算に費やされるためである．
+本付録では，各初期化手法の実行時間を計測し，計算コストの実測値を比較する．
 
-\section{各手法の勾配計算回数}
+\section{計測方法}
+\label{sec:timing_methodology}
 
-まず，各手法における勾配計算回数を整理する．
+\subsection{計測対象}
 
-\subsection{PGD攻撃}
-PGD攻撃は1反復あたり1回の勾配計算を行う．反復数を$T$とすると，PGD攻撃単体での勾配計算回数は$T$回である．
+実行時間の計測は，初期化手法の比較を目的とする．公平な比較のため，以下の2つのグループに分けて計測を行う：
+\begin{itemize}
+    \item \textbf{1リスタート比較}: ランダム初期化（リスタート数1）とDeepFool初期化（リスタート数1）
+    \item \textbf{9リスタート比較}: ランダム初期化（リスタート数9）とMulti-DeepFool初期化（リスタート数9）
+\end{itemize}
 
-\subsection{DeepFool}
-DeepFoolは各反復において，現在の予測ラベル以外の全ラベル$k$について1回ずつ勾配計算する．$K$クラス分類問題では1反復あたり$(K-1)$回の勾配計算が必要となる．最大反復数を$T_{\text{df}}$とすると，DeepFool単体での勾配計算回数は最大$(K-1) \cdot T_{\text{df}}$回である．なお，DeepFoolは決定境界を超えた時点で終了するため，脆弱なモデルに対しては最大反復数に達する前に終了し，実際の計算コストはこれより低くなる．本分析では最悪ケースとして最大反復数まで実行する場合を想定する．
+\subsection{計測の構成}
 
-\subsection{Multi-DeepFool}
-Multi-DeepFool初期化では，各ターゲットラベル$k$を目標としたDeepFoolを実行する．ターゲットラベルが固定されているため，1反復あたり1回の勾配計算で済む．最大反復数$T_{\text{df}}$において，1ターゲットラベルあたり最大$T_{\text{df}}$回の勾配計算となる．DeepFoolと同様に，決定境界到達時に早期終了するため，実際の計算コストはこれより低くなる場合がある．
+1サンプルに対する攻撃の実行時間を，以下の2つに分けて計測する：
+\begin{enumerate}
+    \item \textbf{初期点生成}: PGD攻撃の初期点$x^0$を生成する処理．ランダム初期化では一様乱数の生成，DeepFool初期化およびMulti-DeepFool初期化ではDeepFoolアルゴリズムの実行が含まれる．
+    \item \textbf{PGD反復}: 初期点$x^0$から$T$回の反復更新（式(\ref{eq:pgd})）を実行する処理．
+\end{enumerate}
 
-\section{手法ごとの総計算コスト}
+\subsection{計測に含まれる処理}
 
-各初期化手法を用いたPGD攻撃の総勾配計算回数を比較する．
+上記の各計測には，以下の処理が含まれる：
 
-\subsection{ランダム初期化PGD}
-$N$回のリスタートを行うランダム初期化PGDでは，総勾配計算回数$C_{\text{random}}$は式(\ref{eq:cost_random})で表される．
-\begin{align}
-    C_{\text{random}} = N \cdot T
-    \label{eq:cost_random}
-\end{align}
+\paragraph{初期点生成}
+\begin{itemize}
+    \item 乱数の生成（ランダム初期化の場合）
+    \item DeepFoolアルゴリズムの反復計算（DeepFool初期化，Multi-DeepFool初期化の場合）
+    \item $\ell_\infty$制約範囲への射影（第\ref{sec:deepfool_init}節，式(\ref{eq:clip})）
+    \item 画素値の$[0, 1]$範囲への制限
+\end{itemize}
 
-\subsection{DeepFool初期化PGD}
-DeepFool初期化PGDでは，DeepFoolの実行後にPGD攻撃を1回実行する．総勾配計算回数$C_{\text{df}}$は式(\ref{eq:cost_df})で表される．
-\begin{align}
-    C_{\text{df}} = (K-1) \cdot T_{\text{df}} + T
-    \label{eq:cost_df}
-\end{align}
+\paragraph{PGD攻撃}
+\begin{itemize}
+    \item 勾配$\nabla_x L(x^t, y)$の計算
+    \item 符号関数$\text{sign}(\cdot)$の適用と摂動の加算
+    \item $\ell_\infty$制約範囲への射影（式(\ref{eq:pgd})における$\text{Clip}_\varepsilon(\cdot)$）
+\end{itemize}
 
-\subsection{Multi-DeepFool初期化PGD}
-Multi-DeepFool初期化PGDでは，$(K-1)$個のターゲットそれぞれに対してターゲット固定DeepFoolとPGD攻撃を実行する．総勾配計算回数$C_{\text{mdf}}$は式(\ref{eq:cost_mdf})で表される．
-\begin{align}
-    C_{\text{mdf}} = (K-1) \cdot T_{\text{df}} + (K-1) \cdot T = (K-1)(T_{\text{df}} + T)
-    \label{eq:cost_mdf}
-\end{align}
+これらの処理は初期化手法およびPGD攻撃の本質的な部分であり，計測に含めることが適切である．
 
-\section{具体的な数値例}
+\subsection{計測から除外される処理}
 
-本研究で用いるパラメータ（$K = 10$，$T_{\text{df}} = 50$，$T = 100$）における各手法の勾配計算回数を表\ref{table:computation_cost}に示す．
+以下の処理は計測から除外される：
+\begin{itemize}
+    \item \textbf{バッチの構成}: 入力画像およびラベルをリスタート数分複製する処理．全ての初期化手法で共通であり，比較に影響しない．
+    \item \textbf{モデルの読み込み}: ニューラルネットワークの構築およびパラメータの復元．攻撃実行前の前処理である．
+    \item \textbf{データの読み込み}: テストデータセットの読み込み．
+    \item \textbf{結果の保存}: 計測結果のファイルへの書き込み．
+\end{itemize}
+
+\subsection{計測の実装}
+
+実行時間の計測にはPythonの\texttt{time.perf\_counter()}関数を使用した．この関数はオペレーティングシステムが提供する高精度タイマーを利用しており，短時間の処理の計測に適している．
+
+\subsection{ウォームアップ}
+
+TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPUメモリの確保が行われ，通常より長い実行時間を要する．このオーバーヘッドを除外するため，本計測の前に同一の処理を1回実行し，その結果は破棄する．
+
+\subsection{並列実行について}
+
+本計測はGPU上で実行されるため，TensorFlowの内部で並列実行が行われる可能性がある．並列実行の有無や程度を完全に制御することは困難であるが，同一の実行環境において各手法を順次実行するため，並列実行の影響は全ての手法に対して同等に作用すると考えられる．したがって，手法間の相対的な比較においては妥当な計測となる．
+
+\subsection{計測値の単位}
+
+計測値は，指定されたリスタート数の全試行に対する合計時間とする．例えば，リスタート数9の場合は9回分の初期点生成と9回分のPGD反復の合計時間を計測する．
+
+リスタートあたりの平均時間を用いない理由は，バッチ処理による並列実行の効果が含まれるためである．GPUではバッチサイズが大きいほど並列処理の効率が向上する傾向があり，リスタートあたりの実行時間はバッチサイズに依存する．この効果は初期化手法の本質的な計算コストとは無関係であるため，合計時間を用いて比較を行う．
+
+\section{計測結果}
+\label{sec:timing_results}
+
+% TODO: 計測結果を記載
+
+\subsection{MNIST}
+
+表\ref{table:mnist_timing}にMNISTにおける実行時間の計測結果を示す．
 
 \begin{table}[H]
-    \caption{各手法の勾配計算回数（$K=10$，$T_{\text{df}}=50$，$T=100$）}
-    \label{table:computation_cost}
+    \caption{MNISTにおける実行時間比較}
+    \label{table:mnist_timing}
     \centering
-    \begin{tabular}{l|r}
+    \small
+    \begin{tabular}{c|l|ccc|c}
         \hline
-        手法 & 勾配計算回数 \\
+        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD反復 (s) & 合計 (s) & 比率 \\
         \hline
-        ランダム初期化（1回） & 100 \\
-        ランダム初期化（9回） & 900 \\
-        DeepFool初期化 & 550 \\
-        Multi-DeepFool初期化 & 1350 \\
+        \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
+         & DeepFool & --- & --- & --- & --- \\
+        \hline
+        \multirow{2}{*}{9} & ランダム & --- & --- & --- & 1.00 \\
+         & Multi-DeepFool & --- & --- & --- & --- \\
         \hline
     \end{tabular}
 \end{table}
 
-DeepFool初期化はリスタート数1として扱うため，ランダム初期化1回と比較する．最悪ケースの場合，DeepFool初期化はランダム初期化1回の5.5倍の計算コストを要する．Multi-DeepFool初期化は$(K-1) = 9$個のターゲットクラスに対して独立にPGD攻撃を実行するため，リスタート数9として扱う（第\ref{sec:experiment_setting}節参照）．同じリスタート数のランダム初期化9回と比較すると，最悪ケースの場合，Multi-DeepFool初期化は1.5倍の計算コストとなる．
+% TODO: 結果の考察を記載
 
-\section{計算コストが有利になる条件}
+\subsection{CIFAR10}
 
-提案手法が計算コストの観点で有利になる条件を分析する．提案手法により誤分類達成が早まり，誤分類達成時点でPGD攻撃を早期終了することで，反復数を$T$から$T'$に削減できると仮定する．
+表\ref{table:cifar10_timing}にCIFAR10における実行時間の計測結果を示す．
 
-\subsection{DeepFool初期化}
+\begin{table}[H]
+    \caption{CIFAR10における実行時間比較}
+    \label{table:cifar10_timing}
+    \centering
+    \small
+    \begin{tabular}{c|l|ccc|c}
+        \hline
+        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD反復 (s) & 合計 (s) & 比率 \\
+        \hline
+        \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
+         & DeepFool & --- & --- & --- & --- \\
+        \hline
+        \multirow{2}{*}{9} & ランダム & --- & --- & --- & 1.00 \\
+         & Multi-DeepFool & --- & --- & --- & --- \\
+        \hline
+    \end{tabular}
+\end{table}
 
-DeepFool初期化がランダム初期化（1回）より効率的となる条件は，式(\ref{eq:breakeven_df})を満たす$T'$が存在することである．
-\begin{align}
-    (K-1) \cdot T_{\text{df}} + T' < T
-    \label{eq:breakeven_df}
-\end{align}
-これを変形すると$T' < T - (K-1) \cdot T_{\text{df}}$となる．$K = 10$，$T_{\text{df}} = 50$，$T = 100$の場合，$T' < 100 - 450 = -350$となり，この条件を満たす正の$T'$は存在しない．すなわち，最悪ケースの場合のDeepFool初期化は計算コストの観点ではランダム初期化（1回）より常に不利である．
+% TODO: 結果の考察を記載
 
-\subsection{Multi-DeepFool初期化}
+\section{考察}
+\label{sec:timing_discussion}
 
-Multi-DeepFool初期化がランダム初期化（$リスタート数(K-1)$回）より効率的となる条件は，式(\ref{eq:breakeven_mdf})を満たす$T'$が存在することである．
-\begin{align}
-    (K-1)(T_{\text{df}} + T') < (K-1) \cdot T
-    \label{eq:breakeven_mdf}
-\end{align}
-これを変形すると$T' < T - T_{\text{df}}$となる．$T_{\text{df}} = 50$，$T = 100$の場合，$T' < 50$である．すなわち，Multi-DeepFool初期化によりPGDの反復数を50回未満に削減できれば，同じ試行回数のランダム初期化より計算効率が良くなる．
-
-\section{計算コストに関するまとめ}
-
-以上の分析から，提案手法は追加の計算コストを要することが明らかになった．ただし，本分析は最悪ケースを想定しているため，実際の計算コストはこれより低くなる場合がある．DeepFool初期化は計算コストの削減を目的とした手法ではなく，誤分類達成反復数の削減効果を検証するための手法として位置づけられる．Multi-DeepFool初期化については，誤分類達成までのPGD反復数を50回未満に削減できる場合に限り計算効率の改善が見込まれる．
+% TODO: 実験結果に基づいて考察を記載

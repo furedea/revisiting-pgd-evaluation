@@ -1,12 +1,14 @@
 """
-Measure execution time for different PGD initialization methods.
-
-Compares:
-- random (n=1) vs deepfool (n=1)
-- random (n=9) vs multi_deepfool (n=9)
+Measure execution time for PGD initialization methods.
 
 Usage:
-    python measure_timing.py --dataset mnist --out_dir outputs/timing
+    python measure_timing.py \
+        --dataset mnist \
+        --model nat \
+        --init random \
+        --num_restarts 1 \
+        --common_indices_file docs/common_correct_indices_mnist_n10.json \
+        --out_dir outputs/timing
 """
 
 import argparse
@@ -22,7 +24,7 @@ tf.compat.v1.disable_eager_execution()
 
 
 # ============================================================
-# Model loading (from src modules)
+# Model loading
 # ============================================================
 def load_model_module(model_src_dir: str, dataset: str) -> Any:
     """Load model module from source directory."""
@@ -147,26 +149,22 @@ def load_common_indices(file_path: str) -> List[int]:
 # Math utilities
 # ============================================================
 def clip_to_unit_interval(x: np.ndarray) -> np.ndarray:
-    """Clip values to [0, 1]."""
     return np.clip(x, 0.0, 1.0).astype(np.float32)
 
 
 def project_linf(x: np.ndarray, x_nat: np.ndarray, eps: float) -> np.ndarray:
-    """Project x onto L-infinity ball around x_nat."""
     return np.clip(x, x_nat - eps, x_nat + eps).astype(np.float32)
 
 
 # ============================================================
-# Initialization methods
+# Initialization methods (timing-focused, minimal overhead)
 # ============================================================
 def random_init(
     rng: np.random.RandomState,
-    x_nat: np.ndarray,
+    x_nat_batch: np.ndarray,
     eps: float,
-    num_restarts: int,
 ) -> np.ndarray:
     """Random initialization within L-infinity ball."""
-    x_nat_batch = np.repeat(x_nat.astype(np.float32), num_restarts, axis=0)
     noise = rng.uniform(low=-eps, high=eps, size=x_nat_batch.shape).astype(np.float32)
     x_adv = project_linf(x_nat_batch + noise, x_nat_batch, eps)
     return clip_to_unit_interval(x_adv)
@@ -217,11 +215,8 @@ def deepfool_init(
         x = x + r[np.newaxis, ...]
         x = np.clip(x, 0.0, 1.0).astype(np.float32)
 
-    # Apply overshoot
     x = x_nat + (1.0 + overshoot) * (x - x_nat)
     x = np.clip(x, 0.0, 1.0).astype(np.float32)
-
-    # Project to eps-ball
     x = project_linf(x, x_nat, eps)
     return clip_to_unit_interval(x)
 
@@ -241,7 +236,6 @@ def multi_deepfool_init(
     start_label = int(np.argmax(logits0[0]))
     num_classes = int(logits0.shape[1])
 
-    # Compute distance to each target class
     grads_all = sess.run(ops.grads_all_op, feed_dict={ops.x_ph: x})[0]
     f = logits0[0] - logits0[0, start_label]
 
@@ -260,7 +254,6 @@ def multi_deepfool_init(
     target_distances.sort(key=lambda x: x[0])
     k_actual = min(num_targets, len(target_distances))
 
-    # Generate adversarial example for each target
     x_advs = []
     for idx in range(k_actual):
         _, target_class = target_distances[idx]
@@ -283,7 +276,6 @@ def multi_deepfool_init(
             else:
                 break
 
-        # Apply overshoot and project
         x_final = x_nat + (1.0 + overshoot) * (x_curr - x_nat)
         x_final = np.clip(x_final, 0.0, 1.0).astype(np.float32)
         x_final = project_linf(x_final, x_nat, eps)
@@ -294,7 +286,7 @@ def multi_deepfool_init(
 
 
 # ============================================================
-# PGD attack
+# PGD attack (timing-focused, no logging/tqdm)
 # ============================================================
 def run_pgd(
     sess: tf.compat.v1.Session,
@@ -306,7 +298,7 @@ def run_pgd(
     alpha: float,
     total_iter: int,
 ) -> np.ndarray:
-    """Run PGD iterations."""
+    """Run PGD iterations (no overhead)."""
     for _ in range(total_iter):
         grad = sess.run(ops.grad_op, feed_dict={ops.x_ph: x_adv, ops.y_ph: y_batch})
         x_adv = x_adv + alpha * np.sign(grad).astype(np.float32)
@@ -323,74 +315,47 @@ def measure_single_sample(
     ops: ModelOps,
     x_nat: np.ndarray,
     y_nat: np.ndarray,
+    init_method: str,
+    num_restarts: int,
     eps: float,
     alpha: float,
     total_iter: int,
     df_max_iter: int,
     df_overshoot: float,
     seed: int,
-) -> Dict[str, Dict[str, float]]:
-    """Measure timing for all methods on a single sample."""
+) -> Dict[str, float]:
+    """Measure timing for a single init method on a single sample."""
     rng = np.random.RandomState(seed)
-    results = {}
 
-    # --- random (n=1) ---
+    # Prepare batch (not included in timing)
+    x_nat_batch = np.repeat(x_nat.astype(np.float32), num_restarts, axis=0)
+    y_batch = np.repeat(y_nat.astype(np.int64), num_restarts, axis=0)
+
+    # --- Measure initialization time ---
     t0 = time.perf_counter()
-    x_adv = random_init(rng, x_nat, eps, num_restarts=1)
+
+    if init_method == "random":
+        x_adv = random_init(rng, x_nat_batch, eps)
+    elif init_method == "deepfool":
+        x_adv = deepfool_init(sess, ops, x_nat, eps, df_max_iter, df_overshoot)
+        # For single DeepFool, we only have 1 init point (expand if num_restarts > 1)
+        if num_restarts > 1:
+            x_adv = np.repeat(x_adv, num_restarts, axis=0)
+    elif init_method == "multi_deepfool":
+        x_adv = multi_deepfool_init(
+            sess, ops, x_nat, eps, df_max_iter, df_overshoot, num_restarts
+        )
+    else:
+        raise ValueError(f"Unknown init method: {init_method}")
+
     t_init = time.perf_counter() - t0
 
-    x_nat_batch = x_nat.astype(np.float32)
-    y_batch = y_nat.astype(np.int64)
-
+    # --- Measure PGD time ---
     t0 = time.perf_counter()
     run_pgd(sess, ops, x_adv, x_nat_batch, y_batch, eps, alpha, total_iter)
     t_pgd = time.perf_counter() - t0
 
-    results["random_n1"] = {"init": t_init, "pgd": t_pgd, "total": t_init + t_pgd}
-
-    # --- random (n=9) ---
-    t0 = time.perf_counter()
-    x_adv = random_init(rng, x_nat, eps, num_restarts=9)
-    t_init = time.perf_counter() - t0
-
-    x_nat_batch = np.repeat(x_nat.astype(np.float32), 9, axis=0)
-    y_batch = np.repeat(y_nat.astype(np.int64), 9, axis=0)
-
-    t0 = time.perf_counter()
-    run_pgd(sess, ops, x_adv, x_nat_batch, y_batch, eps, alpha, total_iter)
-    t_pgd = time.perf_counter() - t0
-
-    results["random_n9"] = {"init": t_init, "pgd": t_pgd, "total": t_init + t_pgd}
-
-    # --- deepfool (n=1) ---
-    t0 = time.perf_counter()
-    x_adv = deepfool_init(sess, ops, x_nat, eps, df_max_iter, df_overshoot)
-    t_init = time.perf_counter() - t0
-
-    x_nat_batch = x_nat.astype(np.float32)
-    y_batch = y_nat.astype(np.int64)
-
-    t0 = time.perf_counter()
-    run_pgd(sess, ops, x_adv, x_nat_batch, y_batch, eps, alpha, total_iter)
-    t_pgd = time.perf_counter() - t0
-
-    results["deepfool_n1"] = {"init": t_init, "pgd": t_pgd, "total": t_init + t_pgd}
-
-    # --- multi_deepfool (n=9) ---
-    t0 = time.perf_counter()
-    x_adv = multi_deepfool_init(sess, ops, x_nat, eps, df_max_iter, df_overshoot, num_targets=9)
-    t_init = time.perf_counter() - t0
-
-    x_nat_batch = np.repeat(x_nat.astype(np.float32), 9, axis=0)
-    y_batch = np.repeat(y_nat.astype(np.int64), 9, axis=0)
-
-    t0 = time.perf_counter()
-    run_pgd(sess, ops, x_adv, x_nat_batch, y_batch, eps, alpha, total_iter)
-    t_pgd = time.perf_counter() - t0
-
-    results["multi_deepfool_n9"] = {"init": t_init, "pgd": t_pgd, "total": t_init + t_pgd}
-
-    return results
+    return {"init": t_init, "pgd": t_pgd, "total": t_init + t_pgd}
 
 
 def run_timing_experiment(
@@ -398,13 +363,15 @@ def run_timing_experiment(
     model_src_dir: str,
     ckpt_dir: str,
     indices: List[int],
+    init_method: str,
+    num_restarts: int,
     eps: float,
     alpha: float,
     total_iter: int,
     df_max_iter: int,
     df_overshoot: float,
     seed: int,
-) -> List[Dict[str, Dict[str, float]]]:
+) -> List[Dict[str, float]]:
     """Run timing experiment for all samples."""
     tf.compat.v1.reset_default_graph()
     model_module = load_model_module(model_src_dir, dataset)
@@ -424,21 +391,22 @@ def run_timing_experiment(
         x_nat = x_test[idx:idx+1].astype(np.float32)
         y_nat = y_test[idx:idx+1].astype(np.int64)
         _ = measure_single_sample(
-            sess, ops, x_nat, y_nat, eps, alpha, total_iter,
-            df_max_iter, df_overshoot, seed
+            sess, ops, x_nat, y_nat, init_method, num_restarts,
+            eps, alpha, total_iter, df_max_iter, df_overshoot, seed
         )
 
         # Actual measurements
         for i, idx in enumerate(indices):
-            print(f"[INFO] Measuring sample {i+1}/{len(indices)} (idx={idx})...")
+            print(f"[INFO] Sample {i+1}/{len(indices)} (idx={idx})")
             x_nat = x_test[idx:idx+1].astype(np.float32)
             y_nat = y_test[idx:idx+1].astype(np.int64)
 
-            results = measure_single_sample(
-                sess, ops, x_nat, y_nat, eps, alpha, total_iter,
-                df_max_iter, df_overshoot, seed
+            result = measure_single_sample(
+                sess, ops, x_nat, y_nat, init_method, num_restarts,
+                eps, alpha, total_iter, df_max_iter, df_overshoot, seed
             )
-            all_results.append(results)
+            all_results.append(result)
+            print(f"       init={result['init']:.4f}s, pgd={result['pgd']:.4f}s, total={result['total']:.4f}s")
 
     return all_results
 
@@ -446,8 +414,11 @@ def run_timing_experiment(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Measure PGD initialization timing")
     parser.add_argument("--dataset", choices=["mnist", "cifar10"], required=True)
-    parser.add_argument("--out_dir", default="outputs/timing")
+    parser.add_argument("--model", choices=["nat", "adv", "nat_and_adv", "weak_adv"], required=True)
+    parser.add_argument("--init", choices=["random", "deepfool", "multi_deepfool"], required=True)
+    parser.add_argument("--num_restarts", type=int, required=True)
     parser.add_argument("--common_indices_file", required=True)
+    parser.add_argument("--out_dir", default="outputs/timing")
     parser.add_argument("--total_iter", type=int, default=100)
     parser.add_argument("--df_max_iter", type=int, default=50)
     parser.add_argument("--df_overshoot", type=float, default=0.02)
@@ -455,27 +426,34 @@ def main() -> None:
     args = parser.parse_args()
 
     dataset = args.dataset
+    model = args.model
+
     if dataset == "mnist":
         model_src_dir = "model_src/mnist_challenge"
-        ckpt_dir = "model_src/mnist_challenge/models/nat"
+        ckpt_dir = f"model_src/mnist_challenge/models/{model}"
         eps = 0.3
         alpha = 0.01
     else:
         model_src_dir = "model_src/cifar10_challenge"
-        ckpt_dir = "model_src/cifar10_challenge/models/nat"
+        ckpt_dir = f"model_src/cifar10_challenge/models/{model}"
         eps = 8.0 / 255.0
         alpha = 2.0 / 255.0
 
     indices = load_common_indices(args.common_indices_file)
+
     print(f"[INFO] Dataset: {dataset}")
+    print(f"[INFO] Model: {model}")
+    print(f"[INFO] Init: {args.init}")
+    print(f"[INFO] Restarts: {args.num_restarts}")
     print(f"[INFO] Samples: {len(indices)}")
-    print(f"[INFO] Indices: {indices}")
 
     results = run_timing_experiment(
         dataset=dataset,
         model_src_dir=model_src_dir,
         ckpt_dir=ckpt_dir,
         indices=indices,
+        init_method=args.init,
+        num_restarts=args.num_restarts,
         eps=eps,
         alpha=alpha,
         total_iter=args.total_iter,
@@ -486,10 +464,16 @@ def main() -> None:
 
     # Save results
     os.makedirs(args.out_dir, exist_ok=True)
-    out_file = os.path.join(args.out_dir, f"timing_{dataset}.json")
+    out_file = os.path.join(
+        args.out_dir,
+        f"timing_{dataset}_{model}_{args.init}_n{args.num_restarts}.json"
+    )
 
     output = {
         "dataset": dataset,
+        "model": model,
+        "init": args.init,
+        "num_restarts": args.num_restarts,
         "indices": indices,
         "total_iter": args.total_iter,
         "df_max_iter": args.df_max_iter,
@@ -502,26 +486,17 @@ def main() -> None:
     with open(out_file, "w") as f:
         json.dump(output, f, indent=2)
 
-    print(f"[INFO] Results saved to {out_file}")
+    print(f"\n[INFO] Saved: {out_file}")
 
-    # Print summary
-    methods = ["random_n1", "deepfool_n1", "random_n9", "multi_deepfool_n9"]
-    print("\n" + "=" * 60)
-    print("Timing Summary (per sample)")
-    print("=" * 60)
-    print(f"{'Method':<20} {'Init (s)':<12} {'PGD (s)':<12} {'Total (s)':<12}")
-    print("-" * 60)
+    # Summary
+    init_times = [r["init"] for r in results]
+    pgd_times = [r["pgd"] for r in results]
+    total_times = [r["total"] for r in results]
 
-    for method in methods:
-        init_times = [r[method]["init"] for r in results]
-        pgd_times = [r[method]["pgd"] for r in results]
-        total_times = [r[method]["total"] for r in results]
-        print(
-            f"{method:<20} "
-            f"{np.mean(init_times):.4f}       "
-            f"{np.mean(pgd_times):.4f}       "
-            f"{np.mean(total_times):.4f}"
-        )
+    print(f"\n[SUMMARY] {dataset}/{model}/{args.init} (n={args.num_restarts})")
+    print(f"  Init:  mean={np.mean(init_times):.4f}s, std={np.std(init_times):.4f}s")
+    print(f"  PGD:   mean={np.mean(pgd_times):.4f}s, std={np.std(pgd_times):.4f}s")
+    print(f"  Total: mean={np.mean(total_times):.4f}s, std={np.std(total_times):.4f}s")
 
 
 if __name__ == "__main__":
