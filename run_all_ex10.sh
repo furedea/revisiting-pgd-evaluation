@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # ---- settings you may change
 PYTHON="${PYTHON:-python}"
-OUT_DIR="${OUT_DIR:-/work/outputs}"
+OUT_DIR="${OUT_DIR:-/work/outputs_ex10}"
 LOG_DIR="${LOG_DIR:-${OUT_DIR}/logs}"
 
 mkdir -p "$OUT_DIR" "$LOG_DIR"
