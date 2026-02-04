@@ -21,7 +21,7 @@
 1サンプルに対する攻撃の実行時間を，以下の2つに分けて計測する：
 \begin{enumerate}
     \item \textbf{初期点生成}: PGD攻撃の初期点$x^0$を生成する処理．ランダム初期化では一様乱数の生成，DeepFool初期化およびMulti-DeepFool初期化ではDeepFoolアルゴリズムの実行が含まれる．
-    \item \textbf{PGD反復}: 初期点$x^0$から$T$回の反復更新（式(\ref{eq:pgd})）を実行する処理．
+    \item \textbf{PGD}: 初期点$x^0$から$T$回の反復更新（式(\ref{eq:pgd})）を実行する処理．
 \end{enumerate}
 
 \subsection{計測に含まれる処理}
@@ -32,18 +32,18 @@
 \begin{itemize}
     \item 乱数の生成（ランダム初期化の場合）
     \item DeepFoolアルゴリズムの反復計算（DeepFool初期化，Multi-DeepFool初期化の場合）
-    \item $\ell_\infty$制約範囲への射影（第\ref{sec:deepfool_init}節，式(\ref{eq:clip})）
+    \item $\ell_\infty$制約範囲への射影（第\ref{sec:projection}節，式(\ref{eq:clip})）
     \item 画素値の$[0, 1]$範囲への制限
 \end{itemize}
 
-\paragraph{PGD攻撃}
+\paragraph{PGD}
 \begin{itemize}
     \item 勾配$\nabla_x L(x^t, y)$の計算
     \item 符号関数$\text{sign}(\cdot)$の適用と摂動の加算
     \item $\ell_\infty$制約範囲への射影（式(\ref{eq:pgd})における$\text{Clip}_\varepsilon(\cdot)$）
 \end{itemize}
 
-これらの処理は初期化手法およびPGD攻撃の本質的な部分であり，計測に含めることが適切である．
+これらの処理は初期化手法およびPGDの本質的な部分であり，計測に含めることが適切である．
 
 \subsection{計測から除外される処理}
 
@@ -69,7 +69,7 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
 
 \subsection{計測値の単位}
 
-計測値は，指定されたリスタート数の全試行に対する合計時間とする．例えば，リスタート数9の場合は9回分の初期点生成と9回分のPGD反復の合計時間を計測する．
+計測値は，指定されたリスタート数の全試行に対する合計時間とする．例えば，リスタート数9の場合は9回分の初期点生成と9回分のPGDの合計時間を計測する．
 
 リスタートあたりの平均時間を用いない理由は，バッチ処理による並列実行の効果が含まれるためである．GPUではバッチサイズが大きいほど並列処理の効率が向上する傾向があり，リスタートあたりの実行時間はバッチサイズに依存する．この効果は初期化手法の本質的な計算コストとは無関係であるため，合計時間を用いて比較を行う．
 
@@ -89,7 +89,7 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
     \small
     \begin{tabular}{c|l|ccc|c}
         \hline
-        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD反復 (s) & 合計 (s) & 比率 \\
+        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
         \hline
         \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
          & DeepFool & --- & --- & --- & --- \\
@@ -113,7 +113,7 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
     \small
     \begin{tabular}{c|l|ccc|c}
         \hline
-        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD反復 (s) & 合計 (s) & 比率 \\
+        リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
         \hline
         \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
          & DeepFool & --- & --- & --- & --- \\

@@ -418,7 +418,8 @@ def main() -> None:
     parser.add_argument("--init", choices=["random", "deepfool", "multi_deepfool"], required=True)
     parser.add_argument("--num_restarts", type=int, required=True)
     parser.add_argument("--common_indices_file", required=True)
-    parser.add_argument("--out_dir", default="outputs/timing")
+    parser.add_argument("--out_dir", required=True)
+    parser.add_argument("--exp_name", required=True, help="Experiment name for subdirectory")
     parser.add_argument("--total_iter", type=int, default=100)
     parser.add_argument("--df_max_iter", type=int, default=50)
     parser.add_argument("--df_overshoot", type=float, default=0.02)
@@ -463,9 +464,10 @@ def main() -> None:
     )
 
     # Save results
-    os.makedirs(args.out_dir, exist_ok=True)
+    timing_dir = os.path.join(args.out_dir, "timing", args.exp_name)
+    os.makedirs(timing_dir, exist_ok=True)
     out_file = os.path.join(
-        args.out_dir,
+        timing_dir,
         f"timing_{dataset}_{model}_{args.init}_n{args.num_restarts}.json"
     )
 
