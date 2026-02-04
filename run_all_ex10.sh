@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # ---- settings you may change
 PYTHON="${PYTHON:-python}"
-OUT_DIR="${OUT_DIR:-/work/outputs_ex10}"
+OUT_DIR="${OUT_DIR:-/work/outputs}"
 LOG_DIR="${LOG_DIR:-${OUT_DIR}/logs}"
 
 mkdir -p "$OUT_DIR" "$LOG_DIR"
@@ -506,12 +506,5 @@ run "src/main.py" "src_cifar10_weak_adv_clean" \
   --epsilon "$CIFAR10_EPS" --alpha "$CIFAR10_ALPHA" \
   --common_indices_file "$CIFAR10_INDICES_FILE" \
   --no_png
-
-# ==================================================================
-# Analyze misclassification
-# ==================================================================
-run "analyze_misclassification.py" "analyze_misclassification" \
-  --input_dir "${OUT_DIR}/arrays/${EXP_NAME}" \
-  --out_dir "$OUT_DIR"
 
 echo "ALL DONE."

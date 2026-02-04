@@ -527,7 +527,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    result_dir = os.path.join(args.out_dir, "misclassification_analysis")
+    # Extract exp_name from input_dir (e.g., "outputs/arrays/run_all_ex10" -> "run_all_ex10")
+    exp_name = os.path.basename(os.path.normpath(args.input_dir))
+
+    result_dir = os.path.join(args.out_dir, "misclassification_analysis", exp_name)
     os.makedirs(result_dir, exist_ok=True)
 
     data_list = load_corrects_files(args.input_dir)
