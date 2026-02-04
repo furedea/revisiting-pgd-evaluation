@@ -438,19 +438,19 @@ PGD攻撃の初期点の選び方として，本研究では以下の初期化�
 \subsection{CIFAR10}
 \label{sec:cifar10_misclassification}
 
-図\ref{fig:cifar10_misclassification_cdf}にCIFAR10における誤分類CDFを示す．
+図\ref{fig:cifar10_misclassification_heatmap}にCIFAR10における誤分類ヒートマップを示す．ヒートマップの読み方は第\ref{sec:mnist_misclassification}節と同様である．
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\linewidth]{figure/cifar10_misclassification_cdf_overlay.png}
-  \caption{CIFAR10における誤分類CDF．横軸は反復数，縦軸はその反復数までに誤分類を達成したサンプルの累積割合．色は初期化手法を表す（青：クリーン，緑：ランダム，赤：DeepFool，オレンジ：Multi-DeepFool）．マーカーと線種はモデルを表す（丸・実線：nat，四角・長破線：nat\_and\_adv，三角・一点鎖線：adv，ダイヤ・点線：weak\_adv）．攻撃に失敗した組み合わせはグレーで表示され，凡例に[FAILED]と記載．同じ反復数で誤分類を達成した曲線が重なるため，視認性のために横方向に微小なオフセットを加えている．}
-  \label{fig:cifar10_misclassification_cdf}
+  \includegraphics[width=\linewidth]{figure/cifar10_misclassification_heatmap.png}
+  \caption{CIFAR10における誤分類ヒートマップ．横軸はPGD反復数，縦軸はモデルと初期化手法の組み合わせ．色はその反復数時点で誤分類している試行の割合（10サンプル平均）を表す（緑：0\%，赤：100\%）．}
+  \label{fig:cifar10_misclassification_heatmap}
 \end{figure}
 
 \medskip
-図\ref{fig:cifar10_misclassification_cdf}より，advモデルのみが攻撃に失敗しており（グレーの[FAILED]），他の3モデル（nat, nat\_and\_adv, weak\_adv）は全て反復2以内に100\%の誤分類を達成している．MNISTと比較して桁違いに高速である．natモデルとnat\_and\_advモデルでは，DeepFool初期化（赤丸・赤四角）が反復0で100\%に達している．Multi-DeepFool初期化（オレンジ実線）は反復0で約50〜66\%から開始し反復1で100\%に達している．クリーン初期化（青丸・青四角）は反復1で100\%に達している．ランダム初期化（緑実線）は反復1で約66\%、反復2で100\%に達している．weak\_advモデルでは，Multi-DeepFool初期化（オレンジ点線）が反復0で約65\%から開始し最も高速である．DeepFool初期化（赤ダイヤ）は反復1で100\%に達している．クリーン初期化（青ダイヤ）とランダム初期化（緑点線）は反復2で100\%に達している．
+% TODO: 図の説明を実験結果に基づいて記述
 
-表\ref{table:cifar10_misclassification}にCIFAR10における誤分類統計量を示す．
+表\ref{table:cifar10_misclassification}にCIFAR10における誤分類統計量（10サンプル平均）を示す．
 
 \begin{table}[H]
   \caption{CIFAR10における誤分類統計}

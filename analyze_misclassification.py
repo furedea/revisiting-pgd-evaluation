@@ -13,7 +13,6 @@ Usage:
 import argparse
 import os
 import re
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
@@ -79,14 +78,24 @@ class CorrectsData:
         return self.corrects.shape[1] - 1
 
 
-@dataclass
 class SampleStats:
     """Statistics for a single sample."""
-    attack_success_rate: float
-    mean: Optional[float]
-    median: Optional[float]
-    p95: Optional[float]
-    misclassification_rates: np.ndarray  # shape: (max_iter+1,)
+
+    __slots__ = ("attack_success_rate", "mean", "median", "p95", "misclassification_rates")
+
+    def __init__(
+        self,
+        attack_success_rate,  # type: float
+        mean,  # type: Optional[float]
+        median,  # type: Optional[float]
+        p95,  # type: Optional[float]
+        misclassification_rates,  # type: np.ndarray
+    ):
+        self.attack_success_rate = attack_success_rate
+        self.mean = mean
+        self.median = median
+        self.p95 = p95
+        self.misclassification_rates = misclassification_rates  # shape: (max_iter+1,)
 
 
 def parse_filename(filepath: str) -> Optional[Tuple[str, str, str, int]]:
@@ -254,15 +263,26 @@ def aggregate_by_sample(
     return result
 
 
-@dataclass
 class AveragedStats:
     """Statistics averaged over multiple samples."""
-    attack_success_rate: float
-    mean: Optional[float]
-    median: Optional[float]
-    p95: Optional[float]
-    misclassification_rates: np.ndarray  # shape: (max_iter+1,)
-    n_samples: int
+
+    __slots__ = ("attack_success_rate", "mean", "median", "p95", "misclassification_rates", "n_samples")
+
+    def __init__(
+        self,
+        attack_success_rate,  # type: float
+        mean,  # type: Optional[float]
+        median,  # type: Optional[float]
+        p95,  # type: Optional[float]
+        misclassification_rates,  # type: np.ndarray
+        n_samples,  # type: int
+    ):
+        self.attack_success_rate = attack_success_rate
+        self.mean = mean
+        self.median = median
+        self.p95 = p95
+        self.misclassification_rates = misclassification_rates  # shape: (max_iter+1,)
+        self.n_samples = n_samples
 
 
 def average_sample_stats(sample_stats_list: List[SampleStats]) -> AveragedStats:
