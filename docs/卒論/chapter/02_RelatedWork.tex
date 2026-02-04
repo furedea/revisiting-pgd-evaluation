@@ -30,11 +30,11 @@ Madryらは，制約付き最適化問題を解くための標準的な手法で
 PGD攻撃では，以下に示す操作を$T$回反復する．$t$回目の反復における画像$x^t$を分類器$f$に入力した場合の損失$L$を計算し，その符号成分のみを取り出す．そして画像$x^t$をその符号成分の方向に学習率$\alpha$の分だけ変化させて$(t+1)$回目の反復における画像$x^{t+1}$を作成する．以上の操作を以下の式(\ref{eq:pgd})で表す．
 
 \begin{align}
-    x^{t+1} = \Pi_{x + \mathcal{S}} \left( x^t + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t, y) \right) \right) \quad (t = 0, 1, \ldots, T-1)
+    x^{t+1} = \text{Clip}_{\varepsilon} \left( x^t + \alpha \cdot \text{sign}\left( \nabla_{x} L(x^t, y) \right) \right) \quad (t = 0, 1, \ldots, T-1)
     \label{eq:pgd}
 \end{align}
 
-ここで$\text{sign}(\cdot)$は各成分の符号を取る関数であり，$\Pi_{x + \mathcal{S}}(\cdot)$は射影演算子である．$D$を入力画像の次元数として，$\mathcal{S} = \{\delta \in \mathbb{R}^D : \|\delta\|_\infty \leq \varepsilon\}$は許容される摂動の集合であり，更新後の点が制約範囲$x + \mathcal{S}$を超えた場合，範囲内の最も近い点に射影される．
+ここで$\text{sign}(\cdot)$は各成分の符号を取る関数であり，$\text{Clip}_{\varepsilon}(\cdot)$ は領域 $\big\lbrace x : \| x \|_{\infty} \le \varepsilon \big\rbrace$ への正射影を表す．更新後の点が制約範囲を超えた場合，範囲内の最も近い点に射影される．
 
 \subsection{ランダム初期化}
 \label{sec:random_init}
@@ -45,17 +45,17 @@ PGD攻撃には初期点$x^0$の設定が必要である．入力点$x$から開
     \label{eq:random_init}
 \end{align}
 
-ここで$D$は入力画像の次元数である．この初期点から式(\ref{eq:pgd})の更新を$T$回繰り返し，最終的に得られる$x^T$が敵対的サンプルとなる．
+ここで$D$は入力画像の次元数であり，$\text{Uniform}(-\varepsilon, \varepsilon)^D$ は，各成分 $u_i$ $(i = 1, \ldots, D)$ が独立に区間 $[-\varepsilon, \varepsilon]$ 上の一様分布に従う $D$ 次元分布を表す．この初期点から式(\ref{eq:pgd})の更新を$T$回繰り返し，最終的に得られる$x^T$が敵対的サンプルとなる．
 
 ランダム初期化により初期点が異なると到達する局所最適解も異なる可能性があるため，一つの入力画像に対して複数の異なる初期点から攻撃を行い，最も損失が大きくなった敵対的サンプルを採用することが一般的である．この複数回の試行の回数をリスタート数と呼ぶ．
 
 ランダム初期化PGD攻撃の全体の手順をAlgorithm \ref{alg:pgd}に示す．
 
-\begin{algorithm}[htbp]
+\begin{algorithm}[H]
 \caption{ランダム初期化PGD攻撃}
 \label{alg:pgd}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，反復回数$T$
+\REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，反復数$T$
 \ENSURE 敵対的サンプル$x^T$
 \STATE $u \sim \text{Uniform}(-\varepsilon, \varepsilon)^D$
 \STATE $x^0 \leftarrow x + u$
@@ -84,15 +84,15 @@ DeepFoolが解く問題は，式(\ref{eq:deepfool_objective})で定義される�
 
 \subsection{基本原理}
 
-DeepFoolの基本原理は，ニューラルネットワークを現在の点の近傍で局所的に線形近似し，最も近いラベル境界へ向かう方向に摂動を更新するというものである．分類器が線形であれば，各ラベルの決定境界は超平面で表されるため，点から超平面までの最短距離を解析的に導出できる．
+DeepFoolは反復的なアルゴリズムであり，ニューラルネットワークを各反復における点の近傍で局所的に線形近似し，最も近いラベル境界へ向かう方向に摂動を更新する．分類器が線形であれば，各ラベルの決定境界は超平面で表されるため，点から超平面までの最短距離を解析的に導出できる．
 
-まず，2クラス分類の場合を考える．線形分類器$f(x) = w^\top x + b$において，決定境界は$f(x) = 0$という超平面である．分類を変化させるには決定境界を越える必要があり，$\ell_2$ノルム最小でこれを達成する摂動を最短摂動と定義する．最短摂動は超平面に垂直な方向（すなわち$w$の方向）に，点と超平面の距離だけ移動することで得られる．点$x_0$における最短摂動$r^*$は式(\ref{eq:deepfool_binary_r})で与えられる．
+まず，2値分類の場合を考える．線形分類器$f(x) = w^\top x + b$において，決定境界は$f(x) = 0$という超平面である．分類を変化させるには決定境界を越える必要があり，$\ell_2$ノルム最小でこれを達成する摂動を最短摂動と定義する．最短摂動は超平面に垂直な方向（すなわち$w$の方向）に，点と超平面の距離だけ移動することで得られる．点$x_0$における最短摂動$r^*$は式(\ref{eq:deepfool_binary_r})で与えられる．
 \begin{align}
     r^* = -\frac{f(x_0)}{\|w\|_2^2} w
     \label{eq:deepfool_binary_r}
 \end{align}
 
-DeepFoolはこのアイデアを多クラス分類に拡張し，さらに非線形分類器に対しては局所的な線形近似を用いて反復的に適用する．
+DeepFoolはこのアイデアを多値分類に拡張し，さらに非線形分類器に対しては局所的な線形近似を用いて反復的に適用する．
 
 \subsection{線形近似とラベル境界}
 
@@ -103,14 +103,14 @@ $t$回目の反復における点を$x^t$，モデルの正規化前の出力を
     \label{eq:deepfool_pred}
 \end{align}
 
-多クラス分類において，ラベル$k$への決定境界を考えるため，現在の予測ラベル$y^t$とラベル$k$の正規化前の出力の差を式(\ref{eq:deepfool_gk})のように定義する．
+多値分類において，ラベル$k$への決定境界を考えるため，現在の予測ラベル$y^t$とラベル$k$の正規化前の出力の差を式(\ref{eq:deepfool_gk})のように定義する．
 
 \begin{align}
     g_k(x) = Z_k(x) - Z_{y^t}(x) \quad (g_k(x)\in \mathbb{R})
     \label{eq:deepfool_gk}
 \end{align}
 
-この$g_k(x)$が正になる領域はラベル$k$として分類される領域であり，$g_k(x) = 0$となる点の集合がラベル$y^t$とラベル$k$の決定境界を表す．
+$g_k(x) = 0$となる点の集合は，現在の予測ラベル$y^t$とラベル$k$の二値分類問題として考えた場合の決定境界を表す．
 
 点$x^t$の近傍において，$g_k(x)$を一次のテイラー展開で近似すると，式(\ref{eq:deepfool_taylor})が得られる．
 
@@ -141,22 +141,24 @@ $t$回目の反復における点を$x^t$，モデルの正規化前の出力を
     \label{eq:deepfool_kstar}
 \end{align}
 
-実際のニューラルネットワークは非線形であるため，線形近似による境界は真の境界からずれている．このずれを考慮し，境界を確実に越えるためにオーバーシュート係数$\eta > 0$（典型的には$\eta = 0.02$）を用いて，式(\ref{eq:deepfool_update})のように更新する．
+実際のニューラルネットワークは非線形であるため，線形近似による境界は真の決定境界からずれている．そのため，このアルゴリズムは境界上またはその近傍で収束することが多い\cite{DeepFool}．そこで境界を越える可能性を高めるため，オーバーシュート係数$\eta > 0$（典型的には$\eta = 0.02$）を用いて，式(\ref{eq:deepfool_update})のように更新する．
 
 \begin{align}
     x^{t+1} = x^t + (1 + \eta) r^t_{k^*}
     \label{eq:deepfool_update}
 \end{align}
 
-この更新を，予測ラベルが変化する（$k(x^{t+1}) \neq k(x^0)$）か，または最大反復回数$T$に達するまで繰り返す．最終的に得られる摂動$\delta = x^T - x^0$が，DeepFoolによる敵対的摂動となる．
+ただし，オーバーシュートを適用しても誤分類が理論的に保証されるわけではない．
+
+この更新を，予測ラベルが変化する（$k(x^{t+1}) \neq k(x^0)$）か，または最大反復数$T$に達するまで繰り返す．最終的に得られる摂動$\delta = x^T - x^0$が，DeepFoolによる敵対的摂動となる．
 
 DeepFoolの全体の手順をAlgorithm \ref{alg:deepfool}に示す．
 
-\begin{algorithm}[htbp]
+\begin{algorithm}[H]
 \caption{DeepFool}
 \label{alg:deepfool}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$x$，分類器出力$Z$，オーバーシュート係数$\eta$，最大反復回数$T$
+\REQUIRE 入力画像$x$，分類器出力$Z$，オーバーシュート係数$\eta$，最大反復数$T$
 \ENSURE 敵対的サンプル$x_{\text{df}}$
 \STATE $x^0 \leftarrow x$，$t \leftarrow 0$
 \WHILE{$k(x^t) = k(x^0)$ \AND $t < T$}
@@ -171,4 +173,3 @@ DeepFoolの全体の手順をAlgorithm \ref{alg:deepfool}に示す．
 \RETURN $x_{\text{df}} \leftarrow x^t$
 \end{algorithmic}
 \end{algorithm}
-

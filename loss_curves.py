@@ -691,6 +691,9 @@ def load_common_indices(file_path: str) -> List[int]:
     """Load pre-computed common correct indices from JSON file."""
     with open(file_path) as f:
         data = json.load(f)
+    # Support both old key (common_correct_indices) and new key (selected_indices)
+    if "selected_indices" in data:
+        return data["selected_indices"]
     return data["common_correct_indices"]
 
 
@@ -1239,13 +1242,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON file with pre-computed common correct indices (from find_common_correct_samples.py)",
     )
+    ap.add_argument(
+        "--no_png",
+        action="store_true",
+        help="Skip PNG figure generation (only save npy files)",
+    )
 
     return ap
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if int(args.n_examples) < 1 or int(args.n_examples) > 5:
-        raise ValueError("--n_examples must be 1..5")
+    if int(args.n_examples) < 1:
+        raise ValueError("--n_examples must be >= 1")
     if str(args.init) == "multi_deepfool" and int(args.df_max_iter) <= 0:
         raise ValueError("--df_max_iter must be > 0")
 
@@ -1531,9 +1539,12 @@ def run_pipeline(args: argparse.Namespace) -> None:
         panels = run_all_examples(args, sess, ops, x_test, y_test, indices)
 
     save_all_outputs(args, base, panels)
-    out_png = render_figure(args, base, title, panels)
 
-    LOGGER.info(f"[done] figure={out_png}")
+    if not args.no_png:
+        out_png = render_figure(args, base, title, panels)
+        LOGGER.info(f"[done] figure={out_png}")
+    else:
+        LOGGER.info("[done] PNG generation skipped (--no_png)")
 
 
 def main() -> None:

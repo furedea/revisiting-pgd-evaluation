@@ -1,6 +1,6 @@
 \chapter{提案手法}
 \label{chapter:proposed}
-本章では，PGD攻撃の初期化にDeepFoolの境界情報を活用する手法を提案する．この手法の目的は，PGD攻撃の誤分類速度を上げる可能性を検証することである．
+本章では，PGD攻撃の初期化にDeepFoolの境界情報を活用する手法を提案する．この手法の目的は，PGD攻撃の初回誤分類反復数を少なくできる可能性を検証することである．
 
 \section{DeepFool初期化の動機}
 \label{sec:motivation}
@@ -14,7 +14,7 @@ PGD攻撃は\ref{sec:pgd}節で述べたように，制約範囲内で損失を�
 本節では，DeepFool初期化の具体的な手順を説明する．
 
 \subsection{DeepFoolによる敵対的サンプルの生成}
-まず，入力画像$x$に対してDeepFoolを適用し，敵対的サンプル$x_{\text{df}}$を生成する．DeepFoolの更新式は式(\ref{eq:deepfool_update})で示した通りであり，パラメータとして最大反復回数$T_{\text{df}}$とオーバーシュート係数$\eta$を設定する．本研究では$T_{\text{df}} = 50$，$\eta = 0.02$を用いる．
+まず，入力画像$x$に対してDeepFoolを適用し，敵対的サンプル$x_{\text{df}}$を生成する．DeepFoolの更新式は式(\ref{eq:deepfool_update})で示した通りであり，パラメータとして最大反復数$T_{\text{df}}$とオーバーシュート係数$\eta$を設定する．本研究では$T_{\text{df}} = 50$，$\eta = 0.02$を用いる．
 
 \subsection{$\ell_\infty$制約への射影}
 \label{sec:projection}
@@ -32,11 +32,11 @@ DeepFoolは$\ell_2$ノルム最小の摂動を求める手法であるため，�
 
 DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg:deepfool_init}に示す．
 
-\begin{algorithm}[htbp]
+\begin{algorithm}[H]
 \caption{DeepFool初期化PGD}
 \label{alg:deepfool_init}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復回数$T$，DeepFool反復回数$T_{\text{df}}$，オーバーシュート係数$\eta$
+\REQUIRE 入力画像$x$，正解ラベル$y$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復数$T$，DeepFool反復数$T_{\text{df}}$，オーバーシュート係数$\eta$
 \STATE $x_{\text{df}}^0 \leftarrow x$，$t \leftarrow 0$
 \WHILE{$k(x_{\text{df}}^t) = k(x)$ \AND $t < T_{\text{df}}$}
     \FOR{$k \neq k(x_{\text{df}}^t)$}
@@ -76,11 +76,11 @@ DeepFool初期化には以下の2つの課題がある：
 
 Multi-DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg:multi_deepfool_init}に示す．
 
-\begin{algorithm}[htbp]
+\begin{algorithm}[H]
 \caption{Multi-DeepFool初期化PGD}
 \label{alg:multi_deepfool_init}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$x$，正解ラベル$y$，クラス数$K$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復回数$T$，DeepFool反復回数$T_{\text{df}}$，オーバーシュート係数$\eta$
+\REQUIRE 入力画像$x$，正解ラベル$y$，クラス数$K$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復数$T$，DeepFool反復数$T_{\text{df}}$，オーバーシュート係数$\eta$
 \ENSURE 敵対的サンプル集合$\{x^{k,T}\}_{k \neq y}$
 \FOR{$k \neq y$}
     \STATE $x_{\text{df}}^{k,0} \leftarrow x$，$t \leftarrow 0$
@@ -98,4 +98,4 @@ Multi-DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg
 \end{algorithmic}
 \end{algorithm}
 
-なお，提案手法の計算コストに関する詳細な分析は付録\ref{appendix:computational_cost}に示す．
+なお，提案手法の計算コストに関する分析は付録\ref{appendix:computational_cost}に示す．

@@ -42,14 +42,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="JSON file with pre-computed common correct indices (from find_common_correct_samples.py)",
     )
+    ap.add_argument(
+        "--no_png",
+        action="store_true",
+        help="Skip PNG figure generation (only save npy files)",
+    )
 
     return ap
 
 
 def validate_args(args: argparse.Namespace) -> None:
     """Validate command-line arguments."""
-    if int(args.n_examples) < 1 or int(args.n_examples) > 5:
-        raise ValueError("--n_examples must be 1..5")
+    if int(args.n_examples) < 1:
+        raise ValueError("--n_examples must be >= 1")
     if str(args.init) == "deepfool" and int(args.df_max_iter) <= 0:
         raise ValueError("--df_max_iter must be > 0")
 
