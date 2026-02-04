@@ -80,7 +80,7 @@ Multi-DeepFool初期化によるPGD攻撃の全体の手順をAlgorithm \ref{alg
 \caption{Multi-DeepFool初期化PGD}
 \label{alg:multi_deepfool_init}
 \begin{algorithmic}[1]
-\REQUIRE 入力画像$x$，正解ラベル$y$，クラス数$K$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復数$T$，DeepFool反復数$T_{\text{df}}$，オーバーシュート係数$\eta$
+\REQUIRE 入力画像$x$，正解ラベル$y$，ラベル数$K$，摂動制約$\varepsilon$，ステップサイズ$\alpha$，PGD反復数$T$，DeepFool反復数$T_{\text{df}}$，オーバーシュート係数$\eta$
 \ENSURE 敵対的サンプル集合$\{x^{k,T}\}_{k \neq y}$
 \FOR{$k \neq y$}
     \STATE $x_{\text{df}}^{k,0} \leftarrow x$，$t \leftarrow 0$

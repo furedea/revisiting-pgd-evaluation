@@ -76,7 +76,7 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
 \section{計測結果}
 \label{sec:timing_results}
 
-% TODO: 計測結果を記載
+本節では，4つのモデル（nat, adv, nat\_and\_adv, weak\_adv）に対して各10サンプル，合計40サンプルの計測結果の平均値を示す．
 
 \subsection{MNIST}
 
@@ -91,16 +91,18 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
         \hline
         リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
         \hline
-        \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
-         & DeepFool & --- & --- & --- & --- \\
+        \multirow{2}{*}{1} & ランダム & 0.0002 & 0.2347 & 0.2348 & 1.00 \\
+         & DeepFool & 0.1211 & 0.2322 & 0.3532 & 1.50 \\
         \hline
-        \multirow{2}{*}{9} & ランダム & --- & --- & --- & 1.00 \\
-         & Multi-DeepFool & --- & --- & --- & --- \\
+        \multirow{2}{*}{9} & ランダム & 0.0004 & 0.2526 & 0.2530 & 1.00 \\
+         & Multi-DeepFool & 0.9256 & 0.2495 & 1.1750 & 4.65 \\
         \hline
     \end{tabular}
 \end{table}
 
-% TODO: 結果の考察を記載
+リスタート数1の比較では，DeepFool初期化はランダム初期化の1.50倍の実行時間を要した．初期点生成時間はDeepFool初期化が0.1211秒，ランダム初期化が0.0002秒であり，DeepFool初期化の初期点生成に要する時間が支配的である．PGD時間は両手法でほぼ同等であった．
+
+リスタート数9の比較では，Multi-DeepFool初期化はランダム初期化の4.65倍の実行時間を要した．初期点生成時間はMulti-DeepFool初期化が0.9256秒，ランダム初期化が0.0004秒であった．
 
 \subsection{CIFAR10}
 
@@ -115,18 +117,26 @@ TensorFlowでは，最初の実行時に計算グラフのコンパイルやGPU�
         \hline
         リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
         \hline
-        \multirow{2}{*}{1} & ランダム & --- & --- & --- & 1.00 \\
-         & DeepFool & --- & --- & --- & --- \\
+        \multirow{2}{*}{1} & ランダム & 0.0003 & 1.7457 & 1.7460 & 1.00 \\
+         & DeepFool & 1.1885 & 1.7327 & 2.9212 & 1.67 \\
         \hline
-        \multirow{2}{*}{9} & ランダム & --- & --- & --- & 1.00 \\
-         & Multi-DeepFool & --- & --- & --- & --- \\
+        \multirow{2}{*}{9} & ランダム & 0.0011 & 3.2218 & 3.2229 & 1.00 \\
+         & Multi-DeepFool & 7.6631 & 3.2253 & 10.8884 & 3.38 \\
         \hline
     \end{tabular}
 \end{table}
 
-% TODO: 結果の考察を記載
+リスタート数1の比較では，DeepFool初期化はランダム初期化の1.67倍の実行時間を要した．初期点生成時間はDeepFool初期化が1.1885秒，ランダム初期化が0.0003秒であった．
+
+リスタート数9の比較では，Multi-DeepFool初期化はランダム初期化の3.38倍の実行時間を要した．初期点生成時間はMulti-DeepFool初期化が7.6631秒，ランダム初期化が0.0011秒であった．
 
 \section{考察}
 \label{sec:timing_discussion}
 
-% TODO: 実験結果に基づいて考察を記載
+計測結果から以下の事実が確認された：
+
+\begin{enumerate}
+    \item \textbf{初期点生成時間の差}: DeepFool初期化およびMulti-DeepFool初期化では，DeepFoolアルゴリズムの反復計算により，ランダム初期化と比較して初期点生成に要する時間が大幅に増加した．
+    \item \textbf{PGD時間の同等性}: 初期化手法によらず，PGDの実行時間はほぼ同等であった．これは，PGDの計算量が初期点の生成方法に依存しないことを示している．
+    \item \textbf{合計時間の比率}: MNISTではDeepFool初期化が1.50倍，Multi-DeepFool初期化が4.65倍，CIFAR10ではDeepFool初期化が1.67倍，Multi-DeepFool初期化が3.38倍の実行時間を要した．
+\end{enumerate}

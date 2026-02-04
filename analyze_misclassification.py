@@ -38,13 +38,6 @@ INIT_DISPLAY = {
     "multi_deepfool": "multi\\_deepfool",
 }
 
-RESTART_COUNTS = {
-    "clean": 1,
-    "random": 20,
-    "deepfool": 1,
-    "multi_deepfool": 9,
-}
-
 NOT_MISCLASSIFIED = -1
 
 
@@ -349,6 +342,7 @@ def plot_heatmap(
     out_path: str,
     dataset: str,
     max_iter: int = 100,
+    n_samples: int = 10,
 ) -> None:
     """Plot heatmap of misclassification rate (averaged over samples).
 
@@ -387,11 +381,11 @@ def plot_heatmap(
     )
 
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-    cbar.set_label("Misclassification Rate (10-sample avg)", fontsize=12)
+    cbar.set_label(f"Misclassification Rate ({n_samples}-sample avg)", fontsize=12)
 
     ax.set_xlabel("PGD Iteration", fontsize=12)
     ax.set_ylabel("Model / Init", fontsize=12)
-    ax.set_title(f"Misclassification Heatmap ({dataset.upper()}, 10-sample average)", fontsize=14)
+    ax.set_title(f"Misclassification Heatmap ({dataset.upper()}, {n_samples}-sample average)", fontsize=14)
 
     ax.set_yticks(range(len(row_labels)))
     ax.set_yticklabels(row_labels, fontsize=10)
@@ -418,11 +412,11 @@ def generate_latex_table(
     lines.append(f"  \\label{{table:{dataset}_misclassification_ex{n_samples}}}")
     lines.append("  \\centering")
     lines.append("  \\small")
-    lines.append("  \\begin{tabular}{l|l|c|cccc}")
+    lines.append("  \\begin{tabular}{l|l|cccc}")
     lines.append("    \\hline")
-    lines.append("    & & & & \\multicolumn{3}{c}{誤分類達成反復数} \\\\")
-    lines.append("    \\cline{5-7}")
-    lines.append("    モデル & 初期化 & リスタート数 & 誤分類達成率 & 平均 & 中央値 & P95 \\\\")
+    lines.append("    & & & \\multicolumn{3}{c}{誤分類達成反復数} \\\\")
+    lines.append("    \\cline{4-6}")
+    lines.append("    モデル & 初期化 & 誤分類達成率 & 平均 & 中央値 & P95 \\\\")
     lines.append("    \\hline")
 
     for model in MODEL_ORDER:
@@ -435,7 +429,6 @@ def generate_latex_table(
                 continue
 
             avg_stats = stats[model][init]
-            restart_count = RESTART_COUNTS.get(init, 1)
 
             model_col = f"\\multirow{{4}}{{*}}{{{MODEL_DISPLAY[model]}}}" if first_model else ""
             first_model = False
@@ -444,12 +437,12 @@ def generate_latex_table(
 
             if avg_stats.mean is not None:
                 lines.append(
-                    f"    {model_col} & {INIT_DISPLAY[init]} & {restart_count} & "
+                    f"    {model_col} & {INIT_DISPLAY[init]} & "
                     f"{attack_rate_pct:.0f}\\% & {avg_stats.mean:.1f} & {avg_stats.median:.1f} & {avg_stats.p95:.1f} \\\\"
                 )
             else:
                 lines.append(
-                    f"    {model_col} & {INIT_DISPLAY[init]} & {restart_count} & "
+                    f"    {model_col} & {INIT_DISPLAY[init]} & "
                     f"{attack_rate_pct:.0f}\\% & --- & --- & --- \\\\"
                 )
 
@@ -483,8 +476,8 @@ def print_summary(
     print(f"\n{'=' * 80}")
     print(f"Dataset: {dataset.upper()} ({n_samples} samples, averaged)")
     print(f"{'=' * 80}")
-    print(f"{'Model':<15} {'Init':<15} {'Restarts':<10} {'Success%':<10} {'Mean':<8} {'Median':<8} {'P95':<8}")
-    print("-" * 80)
+    print(f"{'Model':<15} {'Init':<15} {'Success%':<10} {'Mean':<8} {'Median':<8} {'P95':<8}")
+    print("-" * 70)
 
     for model in MODEL_ORDER:
         if model not in stats:
@@ -494,17 +487,16 @@ def print_summary(
                 continue
 
             avg_stats = stats[model][init]
-            restart_count = RESTART_COUNTS.get(init, 1)
             attack_rate_pct = avg_stats.attack_success_rate * 100
 
             if avg_stats.mean is not None:
                 print(
-                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate_pct:<10.0f} "
+                    f"{model:<15} {init:<15} {attack_rate_pct:<10.0f} "
                     f"{avg_stats.mean:<8.1f} {avg_stats.median:<8.1f} {avg_stats.p95:<8.1f}"
                 )
             else:
                 print(
-                    f"{model:<15} {init:<15} {restart_count:<10} {attack_rate_pct:<10.0f} "
+                    f"{model:<15} {init:<15} {attack_rate_pct:<10.0f} "
                     f"{'---':<8} {'---':<8} {'---':<8}"
                 )
 
@@ -565,6 +557,7 @@ def main() -> None:
             stats,
             os.path.join(dataset_dir, f"{dataset}_misclassification_heatmap.png"),
             dataset,
+            n_samples=n_samples,
         )
 
         # Generate LaTeX table
