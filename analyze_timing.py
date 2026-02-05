@@ -62,15 +62,17 @@ def compute_statistics(timing_list: List[Dict[str, float]]) -> Dict[str, float]:
     }
 
 
-def generate_comparison_table(data: Dict[str, List[Dict[str, float]]], dataset: str) -> str:
+def generate_comparison_table(
+    data: Dict[str, List[Dict[str, float]]], dataset: str, exp_name: str
+) -> str:
     """Generate comparison table (random vs DeepFool-based)."""
     # Check which methods are available
     available = set(data.keys())
 
     lines = []
     lines.append("\\begin{table}[H]")
-    lines.append(f"  \\caption{{{dataset.upper()}における初期化手法の実行時間比較}}")
-    lines.append(f"  \\label{{table:{dataset}_timing_comparison}}")
+    lines.append(f"  \\caption{{{dataset.upper()}における初期化手法の実行時間比較（{exp_name}）}}")
+    lines.append(f"  \\label{{table:{dataset}_timing_comparison_{exp_name}}}")
     lines.append("  \\centering")
     lines.append("  \\small")
     lines.append("  \\begin{tabular}{c|l|ccc|c}")
@@ -167,8 +169,11 @@ def main() -> None:
         print("[ERROR] No timing results found")
         return
 
-    # Create output directory
-    result_dir = os.path.join(args.out_dir, "timing_analysis")
+    # Extract exp_name from input_dir (e.g., "outputs/timing/timing_ex100" -> "timing_ex100")
+    exp_name = os.path.basename(os.path.normpath(args.input_dir))
+
+    # Create output directory with exp_name
+    result_dir = os.path.join(args.out_dir, "timing_analysis", exp_name)
     os.makedirs(result_dir, exist_ok=True)
 
     for dataset in sorted(all_data.keys()):
@@ -178,7 +183,7 @@ def main() -> None:
         print_summary(data, dataset)
 
         # Generate and save LaTeX table
-        table = generate_comparison_table(data, dataset)
+        table = generate_comparison_table(data, dataset, exp_name)
         out_file = os.path.join(result_dir, f"{dataset}_timing_comparison.tex")
 
         with open(out_file, "w") as f:

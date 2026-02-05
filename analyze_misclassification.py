@@ -278,61 +278,103 @@ class AveragedStats:
         self.n_samples = n_samples
 
 
-def average_sample_stats(sample_stats_list: List[SampleStats]) -> AveragedStats:
-    """Average statistics over multiple samples.
+def compute_combined_stats(
+    data_list: List[CorrectsData], max_iter: int = 100
+) -> AveragedStats:
+    """Compute statistics by combining all samples and restarts.
 
-    For numeric stats (mean, median, p95), average only over samples where attack succeeded.
+    All (sample, restart) combinations are pooled together to compute
+    mean, median, and p95 directly from the combined data.
     """
-    n_samples = len(sample_stats_list)
-    if n_samples == 0:
+    if not data_list:
         return AveragedStats(
             attack_success_rate=0.0,
             mean=None,
             median=None,
             p95=None,
-            misclassification_rates=np.zeros(101),
+            misclassification_rates=np.zeros(max_iter + 1),
             n_samples=0,
         )
 
-    # Average attack success rate
-    attack_success_rate = np.mean([s.attack_success_rate for s in sample_stats_list])
+    n_samples = len(data_list)
 
-    # Average numeric stats (only from samples with successful attacks)
-    means = [s.mean for s in sample_stats_list if s.mean is not None]
-    medians = [s.median for s in sample_stats_list if s.median is not None]
-    p95s = [s.p95 for s in sample_stats_list if s.p95 is not None]
+    # Collect all first_wrong values from all samples and restarts
+    all_first_wrong = []
+    for data in data_list:
+        first_wrong = compute_first_misclassification(data.corrects)
+        all_first_wrong.extend(first_wrong.tolist())
 
-    avg_mean = float(np.mean(means)) if means else None
-    avg_median = float(np.mean(medians)) if medians else None
-    avg_p95 = float(np.mean(p95s)) if p95s else None
+    all_first_wrong = np.array(all_first_wrong)
+    n_total = len(all_first_wrong)
+    misclassified = all_first_wrong[all_first_wrong >= 0]
+    n_misclassified = len(misclassified)
 
-    # Average misclassification rates
-    all_rates = np.array([s.misclassification_rates for s in sample_stats_list])
-    avg_rates = np.mean(all_rates, axis=0)
+    # Compute attack success rate over all (sample, restart) combinations
+    attack_success_rate = n_misclassified / n_total if n_total > 0 else 0.0
+
+    # Compute statistics from pooled data
+    if n_misclassified > 0:
+        combined_mean = float(np.mean(misclassified))
+        combined_median = float(np.median(misclassified))
+        combined_p95 = float(np.percentile(misclassified, 95))
+    else:
+        combined_mean = None
+        combined_median = None
+        combined_p95 = None
+
+    # Compute misclassification rate at each iteration (over all combinations)
+    rates = np.zeros(max_iter + 1)
+    for t in range(max_iter + 1):
+        n_wrong_at_t = np.sum((all_first_wrong >= 0) & (all_first_wrong <= t))
+        rates[t] = n_wrong_at_t / n_total if n_total > 0 else 0.0
 
     return AveragedStats(
         attack_success_rate=attack_success_rate,
-        mean=avg_mean,
-        median=avg_median,
-        p95=avg_p95,
-        misclassification_rates=avg_rates,
+        mean=combined_mean,
+        median=combined_median,
+        p95=combined_p95,
+        misclassification_rates=rates,
         n_samples=n_samples,
     )
 
 
-def compute_averaged_stats(
-    sample_stats: Dict[str, Dict[str, Dict[str, List[SampleStats]]]],
+def aggregate_corrects_by_group(
+    data_list: List[CorrectsData],
+) -> Dict[str, Dict[str, Dict[str, List[CorrectsData]]]]:
+    """Group CorrectsData by dataset/model/init.
+
+    Returns:
+        result[dataset][model][init] = list of CorrectsData
+    """
+    result: Dict[str, Dict[str, Dict[str, List[CorrectsData]]]] = {}
+
+    for data in data_list:
+        if data.dataset not in result:
+            result[data.dataset] = {}
+        if data.model not in result[data.dataset]:
+            result[data.dataset][data.model] = {}
+        if data.init not in result[data.dataset][data.model]:
+            result[data.dataset][data.model][data.init] = []
+
+        result[data.dataset][data.model][data.init].append(data)
+
+    return result
+
+
+def compute_combined_stats_for_all(
+    grouped_data: Dict[str, Dict[str, Dict[str, List[CorrectsData]]]],
+    max_iter: int = 100,
 ) -> Dict[str, Dict[str, Dict[str, AveragedStats]]]:
-    """Compute averaged statistics for each dataset/model/init."""
+    """Compute combined statistics for each dataset/model/init."""
     result: Dict[str, Dict[str, Dict[str, AveragedStats]]] = {}
 
-    for dataset in sample_stats:
+    for dataset in grouped_data:
         result[dataset] = {}
-        for model in sample_stats[dataset]:
+        for model in grouped_data[dataset]:
             result[dataset][model] = {}
-            for init in sample_stats[dataset][model]:
-                stats_list = sample_stats[dataset][model][init]
-                result[dataset][model][init] = average_sample_stats(stats_list)
+            for init in grouped_data[dataset][model]:
+                data_list = grouped_data[dataset][model][init]
+                result[dataset][model][init] = compute_combined_stats(data_list, max_iter)
 
     return result
 
@@ -435,7 +477,8 @@ def generate_latex_table(
 
             attack_rate_pct = avg_stats.attack_success_rate * 100
 
-            if avg_stats.mean is not None:
+            # Show "---" if attack success rate < 1% or mean is None
+            if avg_stats.mean is not None and attack_rate_pct >= 1.0:
                 lines.append(
                     f"    {model_col} & {INIT_DISPLAY[init]} & "
                     f"{attack_rate_pct:.0f}\\% & {avg_stats.mean:.1f} & {avg_stats.median:.1f} & {avg_stats.p95:.1f} \\\\"
@@ -530,11 +573,11 @@ def main() -> None:
         print("[ERROR] No corrects files found")
         return
 
-    # Aggregate by sample first
-    sample_stats = aggregate_by_sample(data_list)
+    # Group data by dataset/model/init
+    grouped_data = aggregate_corrects_by_group(data_list)
 
-    # Compute averaged statistics
-    averaged_stats = compute_averaged_stats(sample_stats)
+    # Compute combined statistics (all samples and restarts pooled together)
+    averaged_stats = compute_combined_stats_for_all(grouped_data)
 
     datasets = sorted(averaged_stats.keys())
 
