@@ -9,25 +9,25 @@
     \cline{4-6}
     モデル & 初期化 & 誤分類達成率 & 平均 & 中央値 & P95 \\
     \hline
-    \multirow{4}{*}{nat} & clean & 100\% & 9.4 & 9.4 & 9.4 \\
-     & random & 100\% & 5.4 & 5.4 & 6.7 \\
+    \multirow{4}{*}{nat} & clean & 100\% & 9.4 & 9.0 & 15.0 \\
+     & random & 100\% & 5.4 & 5.0 & 10.0 \\
      & deepfool & 100\% & 0.0 & 0.0 & 0.0 \\
-     & multi\_deepfool & 100\% & 0.5 & 0.4 & 0.8 \\
+     & multi\_deepfool & 100\% & 0.5 & 0.0 & 1.0 \\
     \hline
-    \multirow{4}{*}{nat\_and\_adv} & clean & 25\% & 24.4 & 24.4 & 24.4 \\
-     & random & 5\% & 42.4 & 42.2 & 54.4 \\
-     & deepfool & 30\% & 10.5 & 10.5 & 10.5 \\
-     & multi\_deepfool & 22\% & 24.0 & 21.4 & 37.1 \\
+    \multirow{4}{*}{nat\_and\_adv} & clean & 25\% & 24.4 & 19.0 & 45.0 \\
+     & random & 5\% & 28.2 & 28.0 & 76.4 \\
+     & deepfool & 30\% & 10.5 & 9.0 & 26.7 \\
+     & multi\_deepfool & 22\% & 20.4 & 14.0 & 68.0 \\
     \hline
     \multirow{4}{*}{adv} & clean & 0\% & --- & --- & --- \\
-     & random & 0\% & 54.5 & 52.5 & 71.4 \\
+     & random & 0\% & --- & --- & --- \\
      & deepfool & 0\% & --- & --- & --- \\
      & multi\_deepfool & 0\% & --- & --- & --- \\
     \hline
-    \multirow{4}{*}{weak\_adv} & clean & 99\% & 35.8 & 35.8 & 35.8 \\
-     & random & 99\% & 24.6 & 24.3 & 30.4 \\
-     & deepfool & 98\% & 22.8 & 22.8 & 22.8 \\
-     & multi\_deepfool & 100\% & 26.8 & 25.9 & 35.4 \\
+    \multirow{4}{*}{weak\_adv} & clean & 99\% & 35.8 & 34.0 & 58.5 \\
+     & random & 99\% & 24.3 & 23.0 & 49.0 \\
+     & deepfool & 98\% & 22.8 & 22.0 & 42.7 \\
+     & multi\_deepfool & 100\% & 26.7 & 27.0 & 51.1 \\
     \hline
   \end{tabular}
 \end{table}

@@ -423,11 +423,11 @@ def plot_heatmap(
     )
 
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-    cbar.set_label(f"Misclassification Rate ({n_samples}-sample avg)", fontsize=12)
+    cbar.set_label("Misclassification Rate", fontsize=12)
 
     ax.set_xlabel("PGD Iteration", fontsize=12)
     ax.set_ylabel("Model / Init", fontsize=12)
-    ax.set_title(f"Misclassification Heatmap ({dataset.upper()}, {n_samples}-sample average)", fontsize=14)
+    ax.set_title(f"Misclassification Heatmap ({dataset.upper()})", fontsize=14)
 
     ax.set_yticks(range(len(row_labels)))
     ax.set_yticklabels(row_labels, fontsize=10)
@@ -517,7 +517,7 @@ def print_summary(
 ) -> None:
     """Print summary statistics to console."""
     print(f"\n{'=' * 80}")
-    print(f"Dataset: {dataset.upper()} ({n_samples} samples, averaged)")
+    print(f"Dataset: {dataset.upper()} ({n_samples} samples)")
     print(f"{'=' * 80}")
     print(f"{'Model':<15} {'Init':<15} {'Success%':<10} {'Mean':<8} {'Median':<8} {'P95':<8}")
     print("-" * 70)
