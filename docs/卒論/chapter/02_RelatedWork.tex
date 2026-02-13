@@ -34,7 +34,7 @@ PGD攻撃では，以下に示す操作を$T$回反復する．$t$回目の反�
     \label{eq:pgd}
 \end{align}
 
-ここで$\text{sign}(\cdot)$は各成分の符号を取る関数であり，$\text{Clip}_{\varepsilon}(\cdot)$ は領域 $\big\lbrace x : \| x \|_{\infty} \le \varepsilon \big\rbrace$ への正射影を表す．更新後の点が制約範囲を超えた場合，範囲内の最も近い点に射影される．
+ここで$\text{sign}(\cdot)$は各成分の符号を取る関数であり，$\text{Clip}_{\varepsilon}(\cdot)$ は元の入力画像$x$との$\ell_\infty$距離が$\varepsilon$以下となる領域への正射影を表す．更新後の点が制約範囲を超えた場合，範囲内の最も近い点に射影される．
 
 \subsection{ランダム初期化}
 \label{sec:random_init}

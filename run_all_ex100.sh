@@ -286,9 +286,9 @@ run "src/main.py" "src_cifar10_weak_adv_deepfool" \
   --no_png
 
 # ==================================================================
-# loss_curves.py: multi_deepfool init
+# src/main.py: multi_deepfool init
 # ==================================================================
-run "loss_curves.py" "lc_mnist_nat_multi_deepfool" \
+run "src/main.py" "src_mnist_nat_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat \
   --out_dir "$OUT_DIR" \
@@ -302,7 +302,7 @@ run "loss_curves.py" "lc_mnist_nat_multi_deepfool" \
   --common_indices_file "$MNIST_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_mnist_adv_multi_deepfool" \
+run "src/main.py" "src_mnist_adv_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/adv \
   --out_dir "$OUT_DIR" \
@@ -316,7 +316,7 @@ run "loss_curves.py" "lc_mnist_adv_multi_deepfool" \
   --common_indices_file "$MNIST_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_mnist_nat_and_adv_multi_deepfool" \
+run "src/main.py" "src_mnist_nat_and_adv_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/nat_and_adv \
   --out_dir "$OUT_DIR" \
@@ -330,7 +330,7 @@ run "loss_curves.py" "lc_mnist_nat_and_adv_multi_deepfool" \
   --common_indices_file "$MNIST_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_mnist_weak_adv_multi_deepfool" \
+run "src/main.py" "src_mnist_weak_adv_multi_deepfool" \
   --model_src_dir model_src/mnist_challenge \
   --ckpt_dir model_src/mnist_challenge/models/weak_adv \
   --out_dir "$OUT_DIR" \
@@ -344,7 +344,7 @@ run "loss_curves.py" "lc_mnist_weak_adv_multi_deepfool" \
   --common_indices_file "$MNIST_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_cifar10_nat_multi_deepfool" \
+run "src/main.py" "src_cifar10_nat_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat \
   --out_dir "$OUT_DIR" \
@@ -358,7 +358,7 @@ run "loss_curves.py" "lc_cifar10_nat_multi_deepfool" \
   --common_indices_file "$CIFAR10_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_cifar10_adv_multi_deepfool" \
+run "src/main.py" "src_cifar10_adv_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/adv \
   --out_dir "$OUT_DIR" \
@@ -372,7 +372,7 @@ run "loss_curves.py" "lc_cifar10_adv_multi_deepfool" \
   --common_indices_file "$CIFAR10_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_cifar10_nat_and_adv_multi_deepfool" \
+run "src/main.py" "src_cifar10_nat_and_adv_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/nat_and_adv \
   --out_dir "$OUT_DIR" \
@@ -386,7 +386,7 @@ run "loss_curves.py" "lc_cifar10_nat_and_adv_multi_deepfool" \
   --common_indices_file "$CIFAR10_INDICES_FILE" \
   --no_png
 
-run "loss_curves.py" "lc_cifar10_weak_adv_multi_deepfool" \
+run "src/main.py" "src_cifar10_weak_adv_multi_deepfool" \
   --model_src_dir model_src/cifar10_challenge \
   --ckpt_dir model_src/cifar10_challenge/models/weak_adv \
   --out_dir "$OUT_DIR" \

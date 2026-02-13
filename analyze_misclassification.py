@@ -1,5 +1,4 @@
-"""
-Misclassification analysis for PGD attacks with multiple samples.
+"""Misclassification analysis for PGD attacks with multiple samples.
 
 Generates:
 1. Heatmap: X-axis = PGD iterations, Y-axis = model/init combinations,
@@ -13,11 +12,14 @@ Usage:
 import argparse
 import os
 import re
+import sys
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+
+from src.dataset_config import resolve_dataset_config
 
 matplotlib.use("Agg")
 
@@ -39,6 +41,21 @@ INIT_DISPLAY = {
 }
 
 NOT_MISCLASSIFIED = -1
+
+
+def infer_experiment_name(input_dir: str) -> str:
+    """Infer experiment name from input directory path.
+
+    Extracts the last component of the normalized path as the experiment name.
+
+    Args:
+        input_dir: Path to the input directory
+            (e.g., "outputs/arrays/run_all_ex10/" -> "run_all_ex10")
+
+    Returns:
+        Experiment name string
+    """
+    return os.path.basename(os.path.normpath(input_dir))
 
 
 class CorrectsData:
@@ -138,7 +155,23 @@ def parse_filename(filepath: str) -> Optional[Tuple[str, str, str, int]]:
 
 
 def load_corrects_files(input_dir: str) -> List[CorrectsData]:
-    """Load all *_corrects.npy files from input directory."""
+    """Load all *_corrects.npy files from input directory.
+
+    Args:
+        input_dir: Path to directory containing *_corrects.npy files
+
+    Returns:
+        List of CorrectsData objects
+
+    Raises:
+        FileNotFoundError: if input_dir does not exist
+    """
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(
+            f"Input directory not found: {input_dir}\n"
+            f"Please verify the path and try again."
+        )
+
     data_list = []
 
     for filename in os.listdir(input_dir):
@@ -379,6 +412,68 @@ def compute_combined_stats_for_all(
     return result
 
 
+def _collect_heatmap_rows(
+    stats: Dict[str, Dict[str, AveragedStats]],
+) -> Tuple[List[str], List[str], List[np.ndarray]]:
+    """Collect model names, init names, and rate arrays for heatmap rows."""
+    row_models: List[str] = []
+    row_inits: List[str] = []
+    row_data: List[np.ndarray] = []
+
+    for model in MODEL_ORDER:
+        if model not in stats:
+            continue
+        for init in INIT_ORDER:
+            if init not in stats[model]:
+                continue
+            row_models.append(model)
+            row_inits.append(init)
+            row_data.append(stats[model][init].misclassification_rates)
+
+    return row_models, row_inits, row_data
+
+
+def _draw_model_labels(
+    ax_model: plt.Axes,
+    row_models: List[str],
+    n_rows: int,
+) -> List[float]:
+    """Draw model labels centered per group. Returns separator y positions."""
+    separators: List[float] = []
+    prev_model = None
+    group_start = 0
+
+    for i, model in enumerate(row_models):
+        if model != prev_model:
+            if prev_model is not None:
+                mid_y = (group_start + i - 1) / 2.0
+                ax_model.text(
+                    0.5, mid_y, prev_model,
+                    ha="center", va="center", fontsize=20, fontweight="bold",
+                )
+                separators.append(i - 0.5)
+            prev_model = model
+            group_start = i
+
+    if prev_model is not None:
+        mid_y = (group_start + n_rows - 1) / 2.0
+        ax_model.text(
+            0.5, mid_y, prev_model,
+            ha="center", va="center", fontsize=20, fontweight="bold",
+        )
+
+    return separators
+
+
+def _draw_init_labels(ax_init: plt.Axes, row_inits: List[str]) -> None:
+    """Draw init labels for each row."""
+    for i, init_name in enumerate(row_inits):
+        ax_init.text(
+            0.5, i, init_name,
+            ha="center", va="center", fontsize=20,
+        )
+
+
 def plot_heatmap(
     stats: Dict[str, Dict[str, AveragedStats]],
     out_path: str,
@@ -389,31 +484,34 @@ def plot_heatmap(
     """Plot heatmap of misclassification rate (averaged over samples).
 
     X-axis: PGD iterations (0 to max_iter)
-    Y-axis: model/init combinations
+    Y-axis: model and init shown as two separate label columns
     Color: fraction of trials misclassified at that iteration
     """
-    row_labels = []
-    row_data = []
-
-    for model in MODEL_ORDER:
-        if model not in stats:
-            continue
-        for init in INIT_ORDER:
-            if init not in stats[model]:
-                continue
-            avg_stats = stats[model][init]
-            row_labels.append(f"{model}/{init}")
-            row_data.append(avg_stats.misclassification_rates)
+    row_models, row_inits, row_data = _collect_heatmap_rows(stats)
 
     if not row_data:
         print(f"[WARN] No data for heatmap: {dataset}")
         return
 
     heatmap_matrix = np.array(row_data)
+    n_rows = len(row_models)
 
-    fig, ax = plt.subplots(figsize=(14, len(row_labels) * 0.5 + 2))
+    fig_h = max(n_rows * 0.5 + 2, 4)
+    fig = plt.figure(figsize=(14, fig_h))
 
-    im = ax.imshow(
+    gs = fig.add_gridspec(
+        1, 4,
+        width_ratios=[0.22, 0.22, 1.0, 0.04],
+        wspace=0.05,
+    )
+
+    ax_model = fig.add_subplot(gs[0, 0])
+    ax_init = fig.add_subplot(gs[0, 1])
+    ax_hmap = fig.add_subplot(gs[0, 2])
+    ax_cbar = fig.add_subplot(gs[0, 3])
+
+    # Heatmap
+    im = ax_hmap.imshow(
         heatmap_matrix,
         aspect="auto",
         cmap="RdYlGn_r",
@@ -421,22 +519,44 @@ def plot_heatmap(
         vmax=1,
         interpolation="nearest",
     )
-
-    cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-    cbar.set_label("Misclassification Rate", fontsize=12)
-
-    ax.set_xlabel("PGD Iteration", fontsize=12)
-    ax.set_ylabel("Model / Init", fontsize=12)
-    ax.set_title(f"Misclassification Heatmap ({dataset.upper()})", fontsize=14)
-
-    ax.set_yticks(range(len(row_labels)))
-    ax.set_yticklabels(row_labels, fontsize=10)
+    ax_hmap.set_yticks([])
 
     x_ticks = list(range(0, max_iter + 1, 10))
-    ax.set_xticks(x_ticks)
-    ax.set_xticklabels([str(x) for x in x_ticks], fontsize=10)
+    ax_hmap.set_xticks(x_ticks)
+    ax_hmap.set_xticklabels([str(x) for x in x_ticks], fontsize=18)
+    ax_hmap.set_xlabel("PGD Iteration", fontsize=22)
+    ax_hmap.set_title(
+        f"Misclassification Rate Heatmap ({dataset.upper()})",
+        fontsize=24, pad=12,
+    )
 
-    plt.tight_layout()
+    # Colorbar
+    cbar = fig.colorbar(im, cax=ax_cbar)
+    cbar.set_label("Misclassification Rate", fontsize=18)
+    cbar.ax.tick_params(labelsize=16)
+
+    # Configure label axes to match heatmap y-axis
+    for ax_label in [ax_model, ax_init]:
+        ax_label.set_xlim(0, 1)
+        ax_label.set_ylim(n_rows - 0.5, -0.5)
+        ax_label.set_xticks([])
+        ax_label.set_yticks([])
+        for spine in ax_label.spines.values():
+            spine.set_visible(False)
+
+    # Model labels (centered per group) and separators
+    separators = _draw_model_labels(ax_model, row_models, n_rows)
+    for y in separators:
+        for ax in [ax_model, ax_init, ax_hmap]:
+            ax.axhline(y=y, color="black", linewidth=1.5)
+
+    # Init labels (one per row)
+    _draw_init_labels(ax_init, row_inits)
+
+    # Column headers
+    ax_model.set_title("Model", fontsize=22, fontweight="bold", pad=10)
+    ax_init.set_title("Init", fontsize=22, fontweight="bold", pad=10)
+
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[SAVE] Heatmap: {out_path}")
@@ -544,40 +664,100 @@ def print_summary(
                 )
 
 
-def main() -> None:
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build argument parser for misclassification analysis.
+
+    Returns:
+        Configured ArgumentParser with --input_dir, --out_dir, --exp_name,
+        and --max_iter arguments.
+    """
     parser = argparse.ArgumentParser(
-        description="Analyze misclassification from multiple samples"
+        description=(
+            "Analyze misclassification statistics from PGD attack results. "
+            "Reads *_corrects.npy files from the input directory, computes "
+            "misclassification rates, and generates heatmaps and LaTeX tables."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python analyze_misclassification.py \\\n"
+            "      --input_dir outputs/arrays/run_all_ex10/ --out_dir outputs\n"
+            "  python analyze_misclassification.py \\\n"
+            "      --input_dir outputs/arrays/run_all_ex100/ \\\n"
+            "      --exp_name custom_experiment --max_iter 200"
+        ),
     )
     parser.add_argument(
         "--input_dir",
         type=str,
         required=True,
-        help="Directory containing *_corrects.npy files",
+        help="Directory containing *_corrects.npy files from PGD experiments",
     )
     parser.add_argument(
         "--out_dir",
         type=str,
         default="/work/outputs",
-        help="Base output directory (default: /work/outputs)",
+        help="Base output directory for results (default: /work/outputs)",
     )
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default=None,
+        help=(
+            "Experiment name for output subdirectory. "
+            "If not specified, inferred from the input directory name."
+        ),
+    )
+    parser.add_argument(
+        "--max_iter",
+        type=int,
+        default=100,
+        help="Maximum PGD iteration count (default: 100)",
+    )
+    return parser
+
+
+def main() -> None:
+    """Entry point for misclassification analysis."""
+    parser = build_arg_parser()
     args = parser.parse_args()
 
-    # Extract exp_name from input_dir (e.g., "outputs/arrays/run_all_ex10" -> "run_all_ex10")
-    exp_name = os.path.basename(os.path.normpath(args.input_dir))
+    # Infer experiment name from input directory if not specified
+    exp_name = args.exp_name if args.exp_name else infer_experiment_name(args.input_dir)
+    max_iter = args.max_iter
 
     result_dir = os.path.join(args.out_dir, "misclassification_analysis", exp_name)
     os.makedirs(result_dir, exist_ok=True)
 
-    data_list = load_corrects_files(args.input_dir)
+    # Load corrects files (raises FileNotFoundError if directory missing)
+    try:
+        data_list = load_corrects_files(args.input_dir)
+    except FileNotFoundError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(1)
+
     if not data_list:
-        print("[ERROR] No corrects files found")
-        return
+        print(
+            f"[ERROR] No *_corrects.npy files found in: {args.input_dir}\n"
+            f"Ensure the directory contains PGD experiment output files "
+            f"matching the pattern: {{dataset}}_{{model}}_{{init}}_p{{N}}_corrects.npy",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Validate datasets found against known configurations
+    detected_datasets = set(d.dataset for d in data_list)
+    for ds in detected_datasets:
+        try:
+            resolve_dataset_config(ds)
+        except ValueError:
+            print(f"[WARN] Unknown dataset '{ds}' detected; skipping config validation")
 
     # Group data by dataset/model/init
     grouped_data = aggregate_corrects_by_group(data_list)
 
     # Compute combined statistics (all samples and restarts pooled together)
-    averaged_stats = compute_combined_stats_for_all(grouped_data)
+    averaged_stats = compute_combined_stats_for_all(grouped_data, max_iter=max_iter)
 
     datasets = sorted(averaged_stats.keys())
 
@@ -600,6 +780,7 @@ def main() -> None:
             stats,
             os.path.join(dataset_dir, f"{dataset}_misclassification_heatmap.png"),
             dataset,
+            max_iter=max_iter,
             n_samples=n_samples,
         )
 

@@ -1,7 +1,14 @@
 """Tests for pgd module (non-TF parts)."""
 
+import sys
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
+
+# Ensure module can be imported on ARM Docker without TF
+if "tensorflow" not in sys.modules:
+    sys.modules["tensorflow"] = MagicMock()
 
 from src.dto import PGDBatchResult
 from src.pgd import add_jitter, build_initial_points, choose_show_restart
@@ -47,7 +54,6 @@ class TestBuildInitialPoints:
             init_jitter=0.0,
             x_nat_batch=x_nat_batch,
             eps=0.3,
-            do_clip=True,
         )
         assert result.shape == (5, 784)
         assert result.dtype == np.float32
@@ -63,7 +69,6 @@ class TestBuildInitialPoints:
             init_jitter=0.0,
             x_nat_batch=x_nat_batch,
             eps=eps,
-            do_clip=True,
         )
         diff = np.abs(result - x_nat_batch)
         assert np.all(diff <= eps + 1e-6)
@@ -78,7 +83,6 @@ class TestBuildInitialPoints:
             init_jitter=0.0,
             x_nat_batch=x_nat_batch,
             eps=0.3,
-            do_clip=True,
         )
         assert np.all(result >= 0.0)
         assert np.all(result <= 1.0)
@@ -94,7 +98,6 @@ class TestBuildInitialPoints:
                 init_jitter=0.0,
                 x_nat_batch=x_nat_batch,
                 eps=0.3,
-                do_clip=True,
             )
 
     def test_deepfool_init_uses_x_init(self):
@@ -108,7 +111,6 @@ class TestBuildInitialPoints:
             init_jitter=0.0,
             x_nat_batch=x_nat_batch,
             eps=0.3,
-            do_clip=True,
         )
         assert result.shape == (3, 10)
         np.testing.assert_array_almost_equal(result, np.full((3, 10), 0.7, dtype=np.float32))

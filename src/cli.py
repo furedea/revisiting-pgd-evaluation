@@ -25,7 +25,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--total_iter", type=int, default=100)
     ap.add_argument("--num_restarts", type=int, default=20)
 
-    ap.add_argument("--init", choices=["random", "deepfool", "clean"], default="random")
+    ap.add_argument(
+        "--init",
+        choices=["random", "deepfool", "multi_deepfool", "clean"],
+        default="random",
+    )
     ap.add_argument("--df_max_iter", type=int, default=50)
     ap.add_argument("--df_overshoot", type=float, default=0.02)
     ap.add_argument("--df_jitter", type=float, default=0.0)
@@ -55,7 +59,7 @@ def validate_args(args: argparse.Namespace) -> None:
     """Validate command-line arguments."""
     if int(args.n_examples) < 1:
         raise ValueError("--n_examples must be >= 1")
-    if str(args.init) == "deepfool" and int(args.df_max_iter) <= 0:
+    if str(args.init) in ("deepfool", "multi_deepfool") and int(args.df_max_iter) <= 0:
         raise ValueError("--df_max_iter must be > 0")
 
 
@@ -69,7 +73,7 @@ def format_base_name(args: argparse.Namespace, indices: Tuple[int, ...]) -> str:
     tag = get_model_tag(str(args.ckpt_dir))
     df_part = (
         f"_dfiter{args.df_max_iter}_dfo{args.df_overshoot}"
-        if args.init == "deepfool"
+        if args.init in ("deepfool", "multi_deepfool")
         else ""
     )
 

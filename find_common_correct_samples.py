@@ -6,16 +6,40 @@ import os
 from typing import List, Set
 
 import numpy as np
-import tensorflow as tf
 
-from src.data_loader import load_test_data
-from src.dto import ModelOps
-from src.model_loader import (
-    create_tf_session,
-    instantiate_model,
-    load_model_module,
-    restore_checkpoint,
-)
+from src.dataset_config import resolve_dataset_config
+
+
+def validate_model_src_dir(model_src_dir: str) -> None:
+    """Validate that the model source directory exists.
+
+    Args:
+        model_src_dir: Path to the model source directory.
+
+    Raises:
+        FileNotFoundError: If the directory does not exist.
+    """
+    if not os.path.isdir(model_src_dir):
+        raise FileNotFoundError(
+            f"Model source directory not found: {model_src_dir}\n"
+            f"Ensure the model source is placed at the expected location."
+        )
+
+
+def validate_checkpoint_dir(ckpt_dir: str) -> None:
+    """Validate that the checkpoint directory exists.
+
+    Args:
+        ckpt_dir: Path to the checkpoint directory.
+
+    Raises:
+        FileNotFoundError: If the directory does not exist.
+    """
+    if not os.path.isdir(ckpt_dir):
+        raise FileNotFoundError(
+            f"Checkpoint directory not found: {ckpt_dir}\n"
+            f"Ensure the model checkpoint is placed at the expected location."
+        )
 
 
 def get_correct_indices_for_model(
@@ -26,6 +50,19 @@ def get_correct_indices_for_model(
     y_test: np.ndarray,
 ) -> Set[int]:
     """Get indices of correctly classified samples for a single model."""
+    # Lazy import: TF 1.15.5 crashes on ARM at import time.
+    import tensorflow as tf
+
+    from src.dto import ModelOps
+    from src.model_loader import (
+        create_tf_session,
+        instantiate_model,
+        load_model_module,
+        restore_checkpoint,
+    )
+
+    validate_checkpoint_dir(ckpt_dir)
+
     tf.compat.v1.reset_default_graph()
     model_module = load_model_module(model_src_dir, dataset)
     model = instantiate_model(model_module, mode_default="eval")
@@ -45,7 +82,10 @@ def get_correct_indices_for_model(
             x_batch = x_test[start:end]
             y_batch = y_test[start:end]
 
-            preds = sess.run(ops.y_pred_op, feed_dict={ops.x_ph: x_batch, ops.y_ph: y_batch})
+            preds = sess.run(
+                ops.y_pred_op,
+                feed_dict={ops.x_ph: x_batch, ops.y_ph: y_batch},
+            )
 
             for i, (pred, true_label) in enumerate(zip(preds, y_batch)):
                 if int(pred) == int(true_label):
@@ -67,6 +107,11 @@ def find_common_correct_indices(
     For each class (0 to num_classes-1), randomly select N samples
     from those that all models classify correctly.
     """
+    # Lazy import: data_loader depends on TF at import time.
+    from src.data_loader import load_test_data
+
+    validate_model_src_dir(model_src_dir)
+
     x_test, y_test = load_test_data(dataset, model_src_dir)
 
     common_indices: Set[int] = set(range(len(x_test)))
@@ -93,53 +138,82 @@ def find_common_correct_indices(
 
     for class_label in range(num_classes):
         # Get all valid indices for this class
-        class_indices = [idx for idx in common_indices if y_test[idx] == class_label]
+        class_indices = [
+            idx for idx in common_indices if y_test[idx] == class_label
+        ]
 
         if len(class_indices) >= samples_per_class:
             # Randomly select without replacement
-            chosen = rng.choice(class_indices, size=samples_per_class, replace=False)
+            chosen = rng.choice(
+                class_indices, size=samples_per_class, replace=False
+            )
             selected_indices.extend(chosen.tolist())
-            print(f"  Class {class_label}: randomly selected {samples_per_class} from {len(class_indices)} candidates")
+            print(
+                f"  Class {class_label}: randomly selected "
+                f"{samples_per_class} from {len(class_indices)} candidates"
+            )
         else:
             # Not enough samples, take all available
             selected_indices.extend(class_indices)
-            print(f"  Warning: Class {class_label} only has {len(class_indices)}/{samples_per_class} samples")
+            print(
+                f"  Warning: Class {class_label} only has "
+                f"{len(class_indices)}/{samples_per_class} samples"
+            )
 
     return selected_indices
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build argument parser."""
+    """Build argument parser for finding common correct samples.
+
+    Returns:
+        Configured ArgumentParser with dataset, output, model,
+        and sampling options.
+    """
     parser = argparse.ArgumentParser(
-        description="Find samples correctly classified by all models."
+        description=(
+            "Find test samples correctly classified by all specified models. "
+            "Outputs a JSON file containing the selected sample indices for "
+            "cross-model comparison experiments."
+        ),
     )
     parser.add_argument(
         "--dataset",
         choices=["mnist", "cifar10"],
         required=True,
-        help="Dataset name",
+        help="Dataset name (mnist or cifar10).",
     )
     parser.add_argument(
         "--out_dir",
         default="docs",
-        help="Output directory for JSON file (default: docs)",
+        help=(
+            "Output directory for the JSON file containing selected indices. "
+            "(default: docs)"
+        ),
     )
     parser.add_argument(
         "--models",
         default="nat,adv,nat_and_adv,weak_adv",
-        help="Comma-separated list of model names (default: nat,adv,nat_and_adv,weak_adv)",
+        help=(
+            "Comma-separated list of model names whose checkpoints reside "
+            "under <model_src_dir>/models/<name>/. "
+            "(default: nat,adv,nat_and_adv,weak_adv)"
+        ),
     )
     parser.add_argument(
         "--samples_per_class",
         type=int,
         default=1,
-        help="Number of samples to select per class (default: 1)",
+        help=(
+            "Number of samples to randomly select per class. "
+            "(default: 1)"
+        ),
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=0,
-        help="Random seed for sample selection (default: 0)",
+        help="Random seed for reproducible sample selection. (default: 0)",
     )
     return parser
 
@@ -156,10 +230,9 @@ def main() -> None:
     seed = int(args.seed)
     num_classes = 10
 
-    if dataset == "mnist":
-        model_src_dir = "model_src/mnist_challenge"
-    else:
-        model_src_dir = "model_src/cifar10_challenge"
+    # Resolve model_src_dir from centralized dataset config
+    cfg = resolve_dataset_config(dataset)
+    model_src_dir = cfg.model_src_dir
 
     print(f"Finding common correct indices for {dataset}")
     print(f"Models: {models}")
@@ -177,7 +250,9 @@ def main() -> None:
 
     os.makedirs(out_dir, exist_ok=True)
     total_samples = num_classes * samples_per_class
-    out_file = os.path.join(out_dir, f"common_correct_indices_{dataset}_n{total_samples}.json")
+    out_file = os.path.join(
+        out_dir, f"common_correct_indices_{dataset}_n{total_samples}.json"
+    )
 
     result = {
         "dataset": dataset,
@@ -192,7 +267,10 @@ def main() -> None:
     with open(out_file, "w") as f:
         json.dump(result, f, indent=2)
 
-    print(f"\nSaved {len(selected_indices)} common correct indices to: {out_file}")
+    print(
+        f"\nSaved {len(selected_indices)} common correct indices to: "
+        f"{out_file}"
+    )
 
 
 if __name__ == "__main__":

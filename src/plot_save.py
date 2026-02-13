@@ -98,7 +98,7 @@ def format_panel_metadata(panel: ExamplePanel, panel_index: int, args: argparse.
         f"final_loss_median={float(np.median(final_losses)):.6f}\n"
     )
 
-    if panel.sanity is not None and args.init == "deepfool":
+    if panel.sanity is not None and args.init in ("deepfool", "multi_deepfool"):
         df_lines = ""
         if panel.sanity.df_pred is not None:
             df_lines += f"df_pred={panel.sanity.df_pred}\n"

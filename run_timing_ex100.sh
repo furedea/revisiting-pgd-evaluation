@@ -21,7 +21,8 @@ run() {
   echo "CMD: $PYTHON $script $*"
   echo "=================================================================="
 
-  $PYTHON "$script" "$@" 2>&1 | tee "$log"
+  # shellcheck disable=SC2086
+  $PYTHON $script "$@" 2>&1 | tee "$log"
 }
 
 # Experiment name
@@ -49,23 +50,23 @@ fi
 # ==================================================================
 for MODEL in nat adv nat_and_adv weak_adv; do
   # n=1 comparison: random vs deepfool
-  run "measure_timing.py" "timing_mnist_${MODEL}_random_n1" \
+  run "-m src.timing_cli" "timing_mnist_${MODEL}_random_n1" \
     --dataset mnist --model "$MODEL" --init random --num_restarts 1 \
     --common_indices_file "$MNIST_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
-  run "measure_timing.py" "timing_mnist_${MODEL}_deepfool_n1" \
+  run "-m src.timing_cli" "timing_mnist_${MODEL}_deepfool_n1" \
     --dataset mnist --model "$MODEL" --init deepfool --num_restarts 1 \
     --common_indices_file "$MNIST_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
   # n=9 comparison: random vs multi_deepfool
-  run "measure_timing.py" "timing_mnist_${MODEL}_random_n9" \
+  run "-m src.timing_cli" "timing_mnist_${MODEL}_random_n9" \
     --dataset mnist --model "$MODEL" --init random --num_restarts 9 \
     --common_indices_file "$MNIST_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
-  run "measure_timing.py" "timing_mnist_${MODEL}_multi_deepfool_n9" \
+  run "-m src.timing_cli" "timing_mnist_${MODEL}_multi_deepfool_n9" \
     --dataset mnist --model "$MODEL" --init multi_deepfool --num_restarts 9 \
     --common_indices_file "$MNIST_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
@@ -76,23 +77,23 @@ done
 # ==================================================================
 for MODEL in nat adv nat_and_adv weak_adv; do
   # n=1 comparison: random vs deepfool
-  run "measure_timing.py" "timing_cifar10_${MODEL}_random_n1" \
+  run "-m src.timing_cli" "timing_cifar10_${MODEL}_random_n1" \
     --dataset cifar10 --model "$MODEL" --init random --num_restarts 1 \
     --common_indices_file "$CIFAR10_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
-  run "measure_timing.py" "timing_cifar10_${MODEL}_deepfool_n1" \
+  run "-m src.timing_cli" "timing_cifar10_${MODEL}_deepfool_n1" \
     --dataset cifar10 --model "$MODEL" --init deepfool --num_restarts 1 \
     --common_indices_file "$CIFAR10_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
   # n=9 comparison: random vs multi_deepfool
-  run "measure_timing.py" "timing_cifar10_${MODEL}_random_n9" \
+  run "-m src.timing_cli" "timing_cifar10_${MODEL}_random_n9" \
     --dataset cifar10 --model "$MODEL" --init random --num_restarts 9 \
     --common_indices_file "$CIFAR10_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"
 
-  run "measure_timing.py" "timing_cifar10_${MODEL}_multi_deepfool_n9" \
+  run "-m src.timing_cli" "timing_cifar10_${MODEL}_multi_deepfool_n9" \
     --dataset cifar10 --model "$MODEL" --init multi_deepfool --num_restarts 9 \
     --common_indices_file "$CIFAR10_INDICES_FILE" \
     --out_dir "$OUT_DIR" --exp_name "$EXP_NAME"

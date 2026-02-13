@@ -20,6 +20,7 @@ from src.model_loader import (
     load_model_module,
     restore_checkpoint,
 )
+from src.multi_deepfool import run_multi_deepfool_init_pgd
 from src.pgd import choose_show_restart, run_pgd_batch
 from src.plot_panel import plot_panels
 from src.plot_save import format_panel_metadata, save_panel_outputs
@@ -197,6 +198,57 @@ def run_one_example(
     x_init = None
     init_jitter = 0.0
 
+    if args.init == "multi_deepfool":
+        # Multi-DeepFool branch: runs its own DeepFool + PGD pipeline
+        sanity = log_init_sanity(
+            sess=sess,
+            ops=ops,
+            x_nat=x_nat,
+            y_nat=y_nat,
+            x_df=None,
+            x_init=None,
+            eps=float(args.epsilon),
+        )
+
+        pgd = run_multi_deepfool_init_pgd(
+            sess=sess,
+            ops=ops,
+            x_nat=x_nat,
+            y_nat=y_nat,
+            eps=float(args.epsilon),
+            alpha=float(args.alpha),
+            total_iter=int(args.total_iter),
+            num_restarts=int(args.num_restarts),
+            df_max_iter=int(args.df_max_iter),
+            df_overshoot=float(args.df_overshoot),
+            seed=int(args.seed),
+        )
+
+        show_restart = choose_show_restart(pgd)
+        x_adv_show = pgd.x_adv_final[show_restart : show_restart + 1].astype(np.float32)
+        pred_end = int(pgd.preds[show_restart, -1])
+
+        wrong_end = int(np.sum(~pgd.corrects[:, -1]))
+        loss_end = pgd.losses[:, -1]
+        LOGGER.info(
+            f"[pgd] wrong_end={wrong_end}/{int(args.num_restarts)} "
+            f"loss_end(med/min/max)={float(np.median(loss_end)):.4g}/"
+            f"{float(np.min(loss_end)):.4g}/{float(np.max(loss_end)):.4g}"
+        )
+
+        return ExamplePanel(
+            x_nat=x_nat,
+            y_nat=y_nat,
+            x_adv_show=x_adv_show,
+            show_restart=int(show_restart),
+            pred_end=int(pred_end),
+            pgd=pgd,
+            sanity=sanity,
+            x_init=pgd.x_init,
+            x_init_rank=pgd.x_init_rank,
+            test_idx=int(idx),
+        )
+
     if args.init == "deepfool":
         x_df, x_init = build_deepfool_init(
             sess=sess,
@@ -305,6 +357,11 @@ def save_all_outputs(
             f"df_jitter={args.df_jitter}\n"
             f"df_project={args.df_project}\n"
         )
+    elif args.init == "multi_deepfool":
+        df_params = (
+            f"df_max_iter={args.df_max_iter}\n"
+            f"df_overshoot={args.df_overshoot}\n"
+        )
 
     content = (
         "[PARAMETERS]\n"
@@ -390,11 +447,17 @@ def run_pipeline(args: argparse.Namespace) -> None:
         title = format_title(args)
         tag = get_model_tag(str(args.ckpt_dir))
 
-        df_part = (
-            f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot} df_jitter={args.df_jitter}"
-            if args.init == "deepfool"
-            else ""
-        )
+        if args.init == "deepfool":
+            df_part = (
+                f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot}"
+                f" df_jitter={args.df_jitter}"
+            )
+        elif args.init == "multi_deepfool":
+            df_part = (
+                f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot}"
+            )
+        else:
+            df_part = ""
         LOGGER.info(
             f"[run] dataset={args.dataset} indices={indices} tag={tag} init={args.init}"
             f" eps={args.epsilon} alpha={args.alpha} total_iter={args.total_iter} restarts={args.num_restarts}"

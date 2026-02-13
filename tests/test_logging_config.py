@@ -17,6 +17,16 @@ class TestLoggingConfig:
         setup_logging()
 
     def test_setup_logging_sets_level(self):
-        setup_logging()
+        # logging.basicConfig is a no-op when handlers already exist (e.g. pytest).
+        # Remove existing handlers to test basicConfig behavior in isolation.
         root_logger = logging.getLogger()
-        assert root_logger.level == logging.INFO
+        original_handlers = root_logger.handlers[:]
+        original_level = root_logger.level
+        root_logger.handlers = []
+        root_logger.setLevel(logging.WARNING)
+        try:
+            setup_logging()
+            assert root_logger.level == logging.INFO
+        finally:
+            root_logger.handlers = original_handlers
+            root_logger.setLevel(original_level)
