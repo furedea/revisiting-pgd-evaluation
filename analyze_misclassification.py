@@ -501,7 +501,7 @@ def plot_heatmap(
 
     gs = fig.add_gridspec(
         1, 4,
-        width_ratios=[0.22, 0.22, 1.0, 0.04],
+        width_ratios=[0.30, 0.28, 1.0, 0.04],
         wspace=0.05,
     )
 
@@ -546,7 +546,9 @@ def plot_heatmap(
 
     # Model labels (centered per group) and separators
     separators = _draw_model_labels(ax_model, row_models, n_rows)
-    for y in separators:
+    # Group separators + top/bottom borders
+    all_lines = [-0.5] + separators + [n_rows - 0.5]
+    for y in all_lines:
         for ax in [ax_model, ax_init, ax_hmap]:
             ax.axhline(y=y, color="black", linewidth=1.5)
 
