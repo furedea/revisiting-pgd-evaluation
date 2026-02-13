@@ -449,7 +449,7 @@ def _draw_model_labels(
                 mid_y = (group_start + i - 1) / 2.0
                 ax_model.text(
                     0.5, mid_y, prev_model,
-                    ha="center", va="center", fontsize=20, fontweight="bold",
+                    ha="center", va="center", fontsize=15,
                 )
                 separators.append(i - 0.5)
             prev_model = model
@@ -459,7 +459,7 @@ def _draw_model_labels(
         mid_y = (group_start + n_rows - 1) / 2.0
         ax_model.text(
             0.5, mid_y, prev_model,
-            ha="center", va="center", fontsize=20, fontweight="bold",
+            ha="center", va="center", fontsize=15,
         )
 
     return separators
@@ -470,7 +470,7 @@ def _draw_init_labels(ax_init: plt.Axes, row_inits: List[str]) -> None:
     for i, init_name in enumerate(row_inits):
         ax_init.text(
             0.5, i, init_name,
-            ha="center", va="center", fontsize=20,
+            ha="center", va="center", fontsize=15,
         )
 
 
@@ -523,17 +523,17 @@ def plot_heatmap(
 
     x_ticks = list(range(0, max_iter + 1, 10))
     ax_hmap.set_xticks(x_ticks)
-    ax_hmap.set_xticklabels([str(x) for x in x_ticks], fontsize=18)
-    ax_hmap.set_xlabel("PGD Iteration", fontsize=22)
+    ax_hmap.set_xticklabels([str(x) for x in x_ticks], fontsize=15)
+    ax_hmap.set_xlabel("PGD Iteration", fontsize=18)
     ax_hmap.set_title(
         f"Misclassification Rate Heatmap ({dataset.upper()})",
-        fontsize=24, pad=12,
+        fontsize=21, pad=12,
     )
 
     # Colorbar
     cbar = fig.colorbar(im, cax=ax_cbar)
-    cbar.set_label("Misclassification Rate", fontsize=18)
-    cbar.ax.tick_params(labelsize=16)
+    cbar.set_label("Misclassification Rate", fontsize=15)
+    cbar.ax.tick_params(labelsize=13)
 
     # Configure label axes to match heatmap y-axis
     for ax_label in [ax_model, ax_init]:
@@ -556,8 +556,8 @@ def plot_heatmap(
     _draw_init_labels(ax_init, row_inits)
 
     # Column headers
-    ax_model.set_title("Model", fontsize=22, fontweight="bold", pad=10)
-    ax_init.set_title("Init", fontsize=22, fontweight="bold", pad=10)
+    ax_model.set_title("Model", fontsize=18, fontweight="bold", pad=10)
+    ax_init.set_title("Init", fontsize=18, fontweight="bold", pad=10)
 
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
