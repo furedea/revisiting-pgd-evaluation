@@ -1,0 +1,569 @@
+\chapter{評価実験}
+\label{chapter:experiment}
+本章では，第\ref{chapter:introduction}章で述べた目的に基づき，第\ref{chapter:evaluation_method}章で定義した評価指標を用いて，PGD攻撃の誤分類性能を実験的に評価する．
+
+\section{実験対象}
+\label{sec:experiment_target}
+
+本節では，本研究で使用するデータセット，初期化手法，およびモデルについて説明する．
+
+\subsection{データセット}
+\label{sec:datasets}
+
+本研究では，画像分類の代表的なベンチマークデータセットであるMNISTとCIFAR10を使用する．これらはMadryらの実験\cite{PGD}で使用されたデータセットであり，実験の再現性を確保するために同じデータセットを採用した．表\ref{table:datasets}に両データセットの概要を示す．
+
+\begin{table}[H]
+  \caption{使用するデータセットの概要}
+  \label{table:datasets}
+  \centering
+  \begin{tabular}{l|cc}
+    \hline
+    項目 & MNIST & CIFAR10 \\
+    \hline
+    画像サイズ & $28 \times 28 \times 1$ & $32 \times 32 \times 3$ \\
+    訓練データ数 & 60,000 & 50,000 \\
+    テストデータ数 & 10,000 & 10,000 \\
+    ラベル数 & 10 & 10 \\
+    内容 & 手書き数字 (0--9) & 物体画像 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+MNISTは手書き数字（0から9）の画像データセットであり，機械学習の入門的なベンチマークとして広く用いられている．各画像は$28 \times 28$ピクセルのグレースケール画像であり，ピクセル値は$[0, 1]$に正規化されている．
+
+CIFAR10は10種類の物体（飛行機，自動車，鳥，猫，鹿，犬，蛙，馬，船，トラック）の画像データセットである\cite{CIFAR10}．各画像は$32 \times 32$ピクセルの3チャネルカラー画像であり，MNISTと比較してより複雑な画像分類タスクを表現している．ラベルと物体の対応は以下の表\ref{table:CIFAR10}のようになる．
+
+\begin{table}[H]
+  \caption{CIFAR10のラベルと物体の対応}
+  \label{table:CIFAR10}
+  \centering
+  \begin{tabular}{cccc}
+    ラベル & 物体名 & ラベル & 物体名 \\
+    \hline
+    0 & airplane   & 5 & dog \\
+    1 & automobile & 6 & frog \\
+    2 & bird       & 7 & horse \\
+    3 & cat        & 8 & ship \\
+    4 & deer       & 9 & truck \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{モデル}
+\label{sec:target_models}
+
+表\ref{table:models}に使用するモデルの詳細を示す．natおよびadvモデルは，Madryらが公開しているリポジトリ\cite{MadryMNIST, MadryCIFAR10}から入手した事前学習済みモデルである．ただし，advモデルはPGD攻撃に対して極めて頑強であり，100反復以内に誤分類が達成されなかったため，誤分類達成反復数の評価が困難であった．そこで，natとadvの中間的なロバスト性を持つと期待されるnat\_and\_advおよびweak\_advモデルを，同リポジトリのtrain.pyを修正して追加で学習させた．
+
+\begin{table}[H]
+  \caption{実験対象のモデル}
+  \label{table:models}
+  \centering
+  \begin{tabular}{l|p{10cm}}
+    \hline
+    モデル名 & 訓練データ \\
+    \hline
+    nat & クリーンデータのみ \\
+    adv & PGD敵対的サンプルのみ \\
+    nat\_and\_adv & クリーンデータ50\%とPGD敵対的サンプル50\% \\
+    weak\_adv & $\varepsilon$を半分にしたPGD敵対的サンプルのみ \\
+    \hline
+  \end{tabular}
+\end{table}
+
+各モデルの特性と，本研究での実験における意義は以下の通りである：
+\begin{itemize}
+    \item \textbf{nat}：クリーンデータのみで訓練されたモデル．敵対的摂動に対して脆弱であり，PGD攻撃により高い損失に到達しやすい．誤分類が最も容易と予想され，ベースラインとして機能する．
+    \item \textbf{adv}：PGD攻撃で生成した敵対的サンプルのみで訓練されたモデル．敵対的摂動に対して堅牢であり，損失の増加が抑制される傾向がある．誤分類が困難になる可能性があり，初期化手法の効果が顕著に現れると予想される．
+    \item \textbf{nat\_and\_adv}：クリーンデータ50\%とPGD敵対的サンプル50\%を混合して訓練されたモデル．自然精度と敵対的精度の両立を目指した訓練方法であり，natとadvの中間的な特性を持つと予想される．
+    \item \textbf{weak\_adv}：摂動制約$\varepsilon$を標準設定の半分にした弱いPGD攻撃で生成した敵対的サンプルのみで訓練されたモデル．弱い攻撃に対しては堅牢だが，標準的な強さの攻撃に対する堅牢性は限定的．advよりは誤分類しやすいが，natよりは困難と予想される．
+\end{itemize}
+
+これらのモデル間での誤分類性能の違いを比較することで，モデルのロバスト性と誤分類達成反復数の関係を調査する．
+
+\subsection{初期化手法}
+\label{sec:init_methods}
+
+PGD攻撃の初期点の選び方として，本研究では以下の初期化手法を比較する：
+\begin{itemize}
+    \item \textbf{クリーン初期化}：元の入力画像$x$をそのまま初期点として使用する．最も単純な初期化手法である．
+    \item \textbf{ランダム初期化}：入力画像$x$を中心とする$\ell_\infty$制約範囲内から一様乱数で初期点を選択する．Madryらの論文\cite{PGD}で用いられた標準的な手法であり，ベースラインとして機能する．乱数シードを固定しており，実験の再現性が保証される．
+    \item \textbf{DeepFool初期化}：DeepFoolで生成した敵対的サンプルを初期点とする．
+    \item \textbf{Multi-DeepFool初期化}：各ターゲットラベルへのDeepFool結果を初期点とする．
+\end{itemize}
+
+ランダム初期化の詳細は第\ref{sec:random_init}節，DeepFool初期化およびMulti-DeepFool初期化の詳細は第\ref{chapter:proposed}章を参照されたい．
+
+\section{実験設定}
+\label{sec:experiment_setting}
+本節では，実験で使用するパラメータおよびサンプルの選択方法を説明する．
+
+\subsection{攻撃パラメータ}
+表\ref{table:attack_params}にPGD攻撃のパラメータを示す．これらのパラメータはMadryらの論文\cite{PGD}と同一の設定である．DeepFoolのパラメータは，最大反復数$T_{\text{df}} = 50$，オーバーシュート係数$\eta = 0.02$とする．
+
+\begin{table}[H]
+  \caption{PGD攻撃のパラメータ設定}
+  \label{table:attack_params}
+  \centering
+  \begin{tabular}{l|cc}
+    \hline
+    パラメータ & MNIST & CIFAR10 \\
+    \hline
+    摂動制約$\varepsilon$ & $0.3$ & $8/255 \approx 0.031$ \\
+    ステップサイズ$\alpha$ & $0.01$ & $2/255 \approx 0.008$ \\
+    反復数$T$ & $100$ & $100$ \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{リスタート数}
+表\ref{table:restart_per_init}に初期化手法ごとのリスタート数を示す．決定的な初期化手法（クリーン，DeepFool）はリスタート数1，確率的なランダム初期化はリスタート数20として実験を行う．ランダム初期化のリスタート数はMadryらの論文\cite{PGD}と同一の設定である．Multi-DeepFool初期化は9つのターゲットラベルに対して独立にPGD攻撃を実行するため，リスタート数を9として扱う．
+
+\begin{table}[H]
+  \caption{初期化手法ごとのリスタート数}
+  \label{table:restart_per_init}
+  \centering
+  \begin{tabular}{l|c|l}
+    \hline
+    初期化手法 & リスタート数 & 性質 \\
+    \hline
+    クリーン & 1 & 決定的 \\
+    ランダム & 20 & 確率的 \\
+    DeepFool & 1 & 決定的 \\
+    Multi-DeepFool & 9 & 決定的 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{テストサンプルの選択}
+\label{sec:sample_selection}
+
+テストデータの取得にはTensorFlowの標準データローダーを使用した．MNISTはTensorFlow 1.x系に付属するMNISTデータローダー，CIFAR10はKerasのデータセットAPIからそれぞれ取得した．これらのローダーが返すテストデータの順序は固定されており，再現性が保証される．
+
+本研究では，損失曲線の観察（第\ref{sec:loss_curve_observation}節）と誤分類達成反復数の定量分析（第\ref{sec:misclassification_analysis}節）で異なるサンプル選択方法を用いる．いずれの場合も，PGD攻撃の前提条件である「元々正しく分類されているサンプルに対する攻撃」を満たすため，全てのモデル（nat, adv, nat\_and\_adv, weak\_adv）が自然画像の状態で正しく分類するサンプルのみを対象とする．
+
+\paragraph{損失曲線の観察}
+\label{sec:sample_selection_loss_curve}
+
+損失曲線の観察では，各モデルや初期化手法の挙動を定性的に観察することが目的である．テストデータを先頭から順に走査し，全モデルが正しく分類する最初の5枚を評価用サンプルとして使用する．
+
+\paragraph{誤分類達成反復数の定量分析}
+\label{sec:sample_selection_quantitative}
+
+誤分類達成反復数の定量分析では，単一サンプルに依存しない一般的な傾向を把握することが目的である．特定のラベルに偏らないサンプル集合を得るため，以下の手順で各ラベル（0〜9）から10枚ずつサンプルを選択する．
+
+\begin{enumerate}
+    \item テストデータ全体（10,000枚）に対して，全4モデル（nat, adv, nat\_and\_adv, weak\_adv）で推論を行い，全モデルが正しく分類するサンプルのインデックス集合を求める
+    \item 各ラベルについて，上記の集合からそのラベルに属するサンプルを抽出する
+    \item 抽出されたサンプルの中から，乱数シード（$\text{seed}=0$）を固定した上で10枚をランダムに選択する
+\end{enumerate}
+
+これにより，計100枚のサンプルを得る．ランダム選択により，テストデータの並び順に依存しない代表的なサンプル集合が得られる．
+
+誤分類達成反復数の定量分析では，各モデル・各初期化手法について以下の手順で結果を算出する．
+
+\begin{enumerate}
+    \item 100サンプルそれぞれに対してPGD攻撃をリスタート数分実行し，全試行の誤分類達成反復数を収集
+    \item 収集した全試行の誤分類達成反復数から，統計量（誤分類達成率，平均，中央値，P95など）を算出
+\end{enumerate}
+
+試行数は100サンプル$\times$リスタート数であり，初期化手法により異なる（ランダム初期化: $100 \times 20 = 2000$試行，クリーン初期化・DeepFool初期化: $100 \times 1 = 100$試行，Multi-DeepFool初期化: $100 \times 9 = 900$試行）．各反復時点での誤分類している試行の割合はヒートマップに，統計量は表にそれぞれ示す．この方法により，特定のサンプルに依存しない，より一般的な傾向を把握できる．
+
+\subsection{実行環境}
+実験はPython 3.6.9およびTensorFlow 1.15.5を用いて実施した．Madryらが公開しているモデルおよび学習コードはTensorFlow 1.x系で実装されており，これらを正常に動作させるために環境を合わせた．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{損失曲線の観察}
+\label{sec:loss_curve_observation}
+
+本節では，各初期化手法によるPGD攻撃の損失曲線を可視化し，攻撃の挙動を定性的に観察する．これはMadryらの実験の再現及び拡張に相当する．なお，クリーン初期化は他の初期化手法との比較における基準として用いるため，本節では損失曲線を示さず，第\ref{sec:misclassification_analysis}節の定量分析においてのみ扱う．また，nat\_and\_advモデルおよびweak\_advモデルの損失曲線は付録\ref{appendix:loss_curves}に示す．
+
+本節の図は行ごとに全て以下の3段構成となっている．また各列は，節\ref{sec:sample_selection}に基づき選択された，異なる5つのテストサンプルに対応している．
+
+\paragraph{損失曲線（上段）}
+縦軸は交差エントロピー損失（Cross-entropy Loss），横軸はPGD攻撃の反復数（PGD Iterations）を表す．反復0は初期状態に対応する．曲線が上昇するほど攻撃が進行（モデルの予測確信度が低下）していることを意味する．Multi-DeepFool初期化の図では，各曲線の色が境界までの距離の順位を表す．暖色（赤）はより近い境界へ向かった試行，寒色（青）はより遠い境界へ向かった試行を意味する．
+
+\paragraph{正誤ヒートマップ（中段）}
+縦軸は試行番号（Multi-DeepFool初期化では境界までの距離の順位），横軸は反復数を表す．各セルの色は，その時点での敵対的サンプルに対するモデルの予測結果を示す．黄色は正しく分類（攻撃失敗），紫色は誤分類（攻撃成功）を意味する．このヒートマップにより，各試行がいつ攻撃に成功したかを視覚的に確認できる．
+
+\paragraph{画像比較（下段）}
+左側の\texttt{x\_nat}は元の自然画像（摂動を加える前の入力），右側の\texttt{x\_adv}はPGD攻撃により生成された敵対的サンプルを示す．中央の\texttt{x\_init}はPGD攻撃の初期点を表し，初期化手法により以下の通り異なる：
+\begin{itemize}
+  \item \textbf{ランダム初期化}：$\ell_\infty$制約内のランダムな摂動を入力点に加えたサンプル
+  \item \textbf{DeepFool初期化}：$\ell_\infty$制約適用後のDeepFool敵対的サンプル
+  \item \textbf{Multi-DeepFool初期化}：$\ell_\infty$制約適用後に損失が最大となる試行のDeepFool敵対的サンプル．ラベル中の\texttt{rank=X}は，そのサンプルが境界までの距離の順位でX番目のターゲットラベルに対応することを示す（0が最近傍）．
+\end{itemize}
+
+\subsection{ランダム初期化}
+\label{sec:random_loss_curves}
+
+本節では，Madryらの実験の再現及び拡張として，各モデルに対するランダム初期化PGD攻撃の損失曲線と正誤ヒートマップを可視化する．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_random}にMNIST natモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_random.png}
+  \caption{MNIST natモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_random}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_random}より，損失曲線を見ると，20回の試行は異なるランダム初期点から開始しているが，いずれも同程度の値に収束している．これはMadryらの「異なる初期点から開始しても同程度の局所最大解に収束する」という観察と一致する．ヒートマップを見ると，全5サンプルにおいて20回の試行全てが100反復以内に誤分類（紫色）を達成している．誤分類達成反復数はサンプルにより5〜15反復程度の幅がある．
+
+\subsubsection{MNIST advモデル}
+
+図\ref{fig:mnist_adv_random}にMNIST advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_adv_random.png}
+  \caption{MNIST advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_adv_random}より，損失曲線を見ると，advモデルはnatモデルと比較して損失の上昇値が極めて小さいことがわかる．また，natモデルでは初期の数反復で急激な損失上昇が見られたのに対し，advモデルではより緩やかな上昇にとどまり，収束せずに振動する試行も存在する．加えて試行毎に損失曲線の形状が大きく異なる．これはグラフの縦軸がnatモデルと比較して非常に狭い範囲に収まっていることから差が顕著に見えるからだと考えられる．ヒートマップを見ると，全5サンプルにおいて20回の試行全てが100反復以内に誤分類を達成できておらず，全ての試行が最後まで正しく分類（黄色）されている．
+
+\subsubsection{CIFAR10 natモデル}
+
+図\ref{fig:cifar10_nat_random}にCIFAR10 natモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_random.png}
+  \caption{CIFAR10 natモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_random}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_random}より，損失曲線を見ると，全試行が数反復で急速に収束している．ヒートマップを見ると，全5サンプルにおいて20回の試行全てが2反復以内に誤分類（紫色）を達成している．一部の試行では反復0（初期点）の時点で既に誤分類に到達している．MNISTと比較して誤分類到達が非常に高速である．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_random}にCIFAR10 advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_random.png}
+  \caption{CIFAR10 advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_adv_random}より，損失曲線を見ると，MNIST advモデルと比較して損失の上昇幅が大きい試行が存在する一方，ほとんど上昇しない試行も混在している．ヒートマップを見ると，サンプルによって結果が異なり，一部のサンプルでは複数の試行が誤分類を達成しているが，全く誤分類を達成できていないサンプルも存在する．
+
+\subsection{DeepFool初期化}
+\label{sec:deepfool_loss_curves}
+
+本節では，DeepFool初期化PGD攻撃の損失曲線を可視化する．DeepFool初期化は決定的であるため，リスタート数は1であり，各パネルには1本の曲線のみが表示される．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_deepfool}にMNIST natモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_deepfool.png}
+  \caption{MNIST natモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_deepfool}より，損失曲線を見ると，反復0で0付近から開始し，25〜50反復で40〜50程度の局所最大解に収束している．ヒートマップを見ると，全5サンプルで反復0の時点から誤分類（紫色）が達成されている．ランダム初期化（図\ref{fig:mnist_nat_random}）では5〜15反復程度で誤分類を達成していたのに対し，DeepFool初期化では反復0で既に誤分類を達成しており，初期点が決定境界を超えた状態であることがわかる．
+
+\subsubsection{MNIST advモデル}
+
+図\ref{fig:mnist_adv_deepfool}にMNIST advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_adv_deepfool.png}
+  \caption{MNIST advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_adv_deepfool}より，損失曲線を見ると，全サンプルで損失値が$10^{-4}$〜$10^{-2}$程度と非常に小さい範囲に留まり，振動を伴いながら緩やかに上昇している．ヒートマップを見ると，全5サンプルで100反復を通して正しい分類（黄色）が維持されており，誤分類を達成できていない．ランダム初期化（図\ref{fig:mnist_adv_random}）と同様に，DeepFool初期化を用いてもadvモデルに対しては100反復以内に誤分類を達成できない．
+
+\subsubsection{CIFAR10 natモデル}
+
+図\ref{fig:cifar10_nat_deepfool}にCIFAR10 natモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_deepfool.png}
+  \caption{CIFAR10 natモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_deepfool}より，損失曲線を見ると，反復0で0〜10程度から開始し，25反復程度で40〜60程度の局所最大解に収束している．ヒートマップを見ると，全5サンプルで反復0の時点から誤分類（紫色）が達成されている．ランダム初期化（図\ref{fig:cifar10_nat_random}）では2反復以内に誤分類を達成していたのに対し，DeepFool初期化では反復0で既に誤分類を達成している．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_deepfool}にCIFAR10 advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_deepfool.png}
+  \caption{CIFAR10 advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_adv_deepfool}より，損失曲線を見ると，全サンプルで損失値が0〜10程度の範囲で緩やかに上昇している．ヒートマップを見ると，サンプルによって結果が異なり，100反復を通して正しい分類を維持するサンプルと，途中で誤分類を達成するサンプルが混在している．ランダム初期化（図\ref{fig:cifar10_adv_random}）と同様に，サンプルによって誤分類の可否が異なる結果となった．
+
+\subsection{Multi-DeepFool初期化}
+\label{sec:mdf_loss_curves}
+
+本節では，Multi-DeepFool初期化PGD攻撃の損失曲線を可視化する．各パネルには9つのターゲットラベルに対応する9本の曲線が描かれている．
+
+\subsubsection{MNIST natモデル}
+
+図\ref{fig:mnist_nat_mdf}にMNIST natモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_mdf.png}
+  \caption{MNIST natモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なるターゲットラベル）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_mdf}より，損失曲線を見ると，9本の曲線が反復0で0付近から開始し，50反復程度で30〜60程度の局所最大解に収束している．色（境界までの距離の順位）と収束損失の間には明確な傾向は見られない．ヒートマップを見ると，ほとんどの試行が反復0〜2の時点で誤分類（紫色）を達成している．ランダム初期化（図\ref{fig:mnist_nat_random}）では5〜15反復程度で誤分類を達成していたのに対し，Multi-DeepFool初期化ではほとんどの試行で反復0〜2で誤分類を達成している．
+
+\subsubsection{MNIST advモデル}
+
+図\ref{fig:mnist_adv_mdf}にMNIST advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_adv_mdf.png}
+  \caption{MNIST advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なるターゲットラベル）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_adv_mdf}より，損失曲線を見ると，全サンプルで損失値が$10^{-5}$〜$10^{-2}$程度と非常に小さい範囲に留まり，振動を伴いながら緩やかに上昇している．ヒートマップを見ると，全5サンプルにおいて9つの試行全てが100反復を通して正しい分類（黄色）を維持しており，誤分類を達成できていない．ランダム初期化（図\ref{fig:mnist_adv_random}）と同様に，Multi-DeepFool初期化を用いてもadvモデルに対しては100反復以内に誤分類を達成できない．
+
+\subsubsection{CIFAR10 natモデル}
+
+図\ref{fig:cifar10_nat_mdf}にCIFAR10 natモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_mdf.png}
+  \caption{CIFAR10 natモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なるターゲットラベル）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_mdf}より，損失曲線を見ると，9本の曲線が反復0で0〜10程度から開始し，25反復程度で40〜60程度の局所最大解に収束している．ヒートマップを見ると，ほぼ全ての試行が反復0の時点で誤分類（紫色）を達成しており，一部の試行が反復1で誤分類を達成している．ランダム初期化（図\ref{fig:cifar10_nat_random}）では2反復以内に誤分類を達成していたのに対し，Multi-DeepFool初期化ではほぼ全ての試行で反復0〜1で誤分類を達成している．
+
+\subsubsection{CIFAR10 advモデル}
+
+図\ref{fig:cifar10_adv_mdf}にCIFAR10 advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_adv_mdf.png}
+  \caption{CIFAR10 advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なるターゲットラベル）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_adv_mdf}より，損失曲線を見ると，全サンプルで損失値が0〜10程度の範囲で緩やかに上昇している．ヒートマップを見ると，サンプルによって結果が大きく異なる．サンプル1, 3では全試行が100反復を通して正しい分類を維持しており，サンプル2, 4では全試行が誤分類を達成している．特にサンプル5では，境界までの距離が遠い試行（rank 5〜8）が途中で誤分類を達成する一方，境界までの距離が近い試行（rank 0〜4）の一部は100反復を通して正しい分類を維持するという特異な結果を示している．ランダム初期化（図\ref{fig:cifar10_adv_random}）と同様に，サンプルによって誤分類の可否が異なる結果となった．
+
+\section{誤分類達成反復数の定量分析}
+\label{sec:misclassification_analysis}
+
+本節では，第\ref{sec:misclassification_definition}節で定義した誤分類達成反復数を用いて，PGD攻撃の誤分類性能を定量的に分析する．全4モデル（nat, adv, nat\_and\_adv, weak\_adv）および全4初期化手法（クリーン，ランダム，DeepFool，Multi-DeepFool）の結果を比較する．
+
+第\ref{sec:sample_selection_quantitative}節で述べた通り，本節の分析では各ラベルから10枚ずつ選択した計100サンプルに対する全試行から統計量を算出する．
+
+\paragraph{誤分類ヒートマップの読み方}
+誤分類ヒートマップは，横軸にPGD反復数（0〜100），縦軸にモデルと初期化手法の組み合わせを示す．各セルの色は，その反復数時点で誤分類している試行の割合を表す．緑色は誤分類達成率0\%（全試行が正しく分類），赤色は誤分類達成率100\%（全試行が誤分類）を意味する．左側から赤くなるほど少ない反復数で誤分類を達成しており，100反復でも緑色のままの行は攻撃が失敗したことを示す．
+
+\subsection{MNIST}
+\label{sec:mnist_misclassification}
+
+図\ref{fig:mnist_misclassification_heatmap}にMNISTにおける誤分類ヒートマップを示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_misclassification_heatmap.png}
+  \caption{MNISTにおける誤分類ヒートマップ．横軸はPGD反復数，縦軸はモデルと初期化手法の組み合わせ．色はその反復数時点で誤分類している試行の割合を表す（緑：0\%，赤：100\%）．}
+  \label{fig:mnist_misclassification_heatmap}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_misclassification_heatmap}より，以下の傾向が観察される：
+
+\begin{itemize}
+    \item \textbf{nat}：DeepFool初期化およびMulti-DeepFool初期化は反復0から黄色や赤，すなわち誤分類達成率50\%以上を示し，DeepFool初期化の時点から誤分類を達成している試行が多く存在する．ランダム初期化は反復10付近，クリーン初期化は反復20付近で赤(誤分類達成率100\%)に到達している．
+    \item \textbf{nat\_and\_adv}：全体的に緑や黄色，すなわち誤分類達成率50\%以下が支配的である．DeepFool初期化は反復10付近から黄色に移行する一方，ランダム初期化はほぼ緑色，すなわち誤分類達成率5\%ほどのままである．
+    \item \textbf{adv}：全4つの初期化手法で100反復を通して緑色，すなわち誤分類達成率0\%を維持しており，PGD攻撃に対して非常に堅牢であることがわかる．
+    \item \textbf{weak\_adv}：反復30から50付近で緑色から赤色に移行し，natと比較して誤分類達成に多くの反復数を要する．DeepFool初期化の誤分類達成率は他の初期化手法と比較し僅かに高くなっている．
+\end{itemize}
+
+表\ref{table:mnist_misclassification}にMNISTにおける誤分類統計量を示す．
+\begin{table}[H]
+  \caption{MNISTにおける誤分類統計}
+  \label{table:mnist_misclassification}
+  \centering
+  \small
+  \begin{tabular}{l|l|cccc}
+    \hline
+    & & & \multicolumn{3}{c}{誤分類達成反復数} \\
+    \cline{4-6}
+    モデル & 初期化 & 誤分類達成率 & 平均 & 中央値 & P95 \\
+    \hline
+    \multirow{4}{*}{nat} & clean & 100\% & 9.4 & 9.0 & 15.0 \\
+     & random & 100\% & 5.4 & 5.0 & 10.0 \\
+     & deepfool & 100\% & 0.0 & 0.0 & 0.0 \\
+     & multi\_deepfool & 100\% & 0.5 & 0.0 & 1.0 \\
+    \hline
+    \multirow{4}{*}{nat\_and\_adv} & clean & 25\% & 24.4 & 19.0 & 45.0 \\
+     & random & 5\% & 28.2 & 28.0 & 76.4 \\
+     & deepfool & 30\% & 10.5 & 9.0 & 26.7 \\
+     & multi\_deepfool & 22\% & 20.4 & 14.0 & 68.0 \\
+    \hline
+    \multirow{4}{*}{adv} & clean & 0\% & --- & --- & --- \\
+     & random & 0\% & --- & --- & --- \\
+     & deepfool & 0\% & --- & --- & --- \\
+     & multi\_deepfool & 0\% & --- & --- & --- \\
+    \hline
+    \multirow{4}{*}{weak\_adv} & clean & 99\% & 35.8 & 34.0 & 58.5 \\
+     & random & 99\% & 24.3 & 23.0 & 49.0 \\
+     & deepfool & 98\% & 22.8 & 22.0 & 42.7 \\
+     & multi\_deepfool & 100\% & 26.7 & 27.0 & 51.1 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\medskip
+表\ref{table:mnist_misclassification}より，以下の知見が得られる：
+
+\begin{itemize}
+    \item \textbf{nat}：全初期化手法の全試行で誤分類している（誤分類達成率100\%）．DeepFool初期化は初期点の時点で誤分類を達成しており，次いでMulti-DeepFool初期化（平均0.5反復），ランダム初期化（平均5.4反復），クリーン初期化（平均9.4反復）の順である．
+    \item \textbf{nat\_and\_adv}：誤分類達成率は5〜30\%と低い．DeepFool初期化が最も高い誤分類達成率（30\%）かつ最も高速（平均10.5反復）であり，他の初期化手法と比較し大幅に少ない反復数で誤分類を達成している．一方，ランダム初期化は誤分類達成率が5\%と極めて低く，誤分類達成に要する反復数も平均28.2反復と非常に多い．
+    \item \textbf{adv}：全ての初期化手法で誤分類達成率0\%であり，100反復のPGD攻撃に対して非常に堅牢であることがわかる．
+    \item \textbf{weak\_adv}：誤分類達成率は98〜100\%であり，natモデルに近い脆弱性を示す．DeepFool初期化が最も高速（平均22.8反復）で，ランダム初期化（平均24.3反復），Multi-DeepFool初期化（平均26.7反復），クリーン初期化（平均35.8反復）の順である．
+\end{itemize}
+
+\subsection{CIFAR10}
+\label{sec:cifar10_misclassification}
+
+図\ref{fig:cifar10_misclassification_heatmap}にCIFAR10における誤分類ヒートマップを示す．ヒートマップの読み方は第\ref{sec:mnist_misclassification}節と同様である．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_misclassification_heatmap.png}
+  \caption{CIFAR10における誤分類ヒートマップ．横軸はPGD反復数，縦軸はモデルと初期化手法の組み合わせ．色はその反復数時点で誤分類している試行の割合を表す（緑：0\%，赤：100\%）．}
+  \label{fig:cifar10_misclassification_heatmap}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_misclassification_heatmap}より，以下の傾向が観察される：
+\begin{itemize}
+    \item \textbf{nat}：全4初期化手法で反復0〜3以内に赤色（誤分類達成率100\%）に到達している．特にDeepFool初期化やMulti-DeepFool初期化は反復0から黄色や赤であり，初期点の時点で誤分類を達成している試行が多く存在する．
+    \item \textbf{nat\_and\_adv, adv, weak\_adv}：全体的に黄色〜薄緑色（誤分類達成率40〜60\%）が支配的である．反復10以内で色が飽和し，それ以降はほぼ変化しない．これはMNISTと対照的に，初期の数反復で攻撃の成否が決定することを示している．
+\end{itemize}
+
+MNISTと比較しCIFAR10では，全ての組み合わせで反復10以内に色が飽和しており，誤分類達成反復数が桁違いに少ないことがわかる．
+
+表\ref{table:cifar10_misclassification}にCIFAR10における誤分類統計量を示す．
+
+\begin{table}[H]
+  \caption{CIFAR10における誤分類統計}
+  \label{table:cifar10_misclassification}
+  \centering
+  \small
+  \begin{tabular}{l|l|cccc}
+    \hline
+    & & & \multicolumn{3}{c}{誤分類達成反復数} \\
+    \cline{4-6}
+    モデル & 初期化 & 誤分類達成率 & 平均 & 中央値 & P95 \\
+    \hline
+    \multirow{4}{*}{nat} & clean & 100\% & 1.5 & 1.0 & 2.0 \\
+     & random & 100\% & 1.2 & 1.0 & 2.0 \\
+     & deepfool & 100\% & 0.0 & 0.0 & 0.0 \\
+     & multi\_deepfool & 100\% & 0.3 & 0.0 & 1.0 \\
+    \hline
+    \multirow{4}{*}{nat\_and\_adv} & clean & 36\% & 4.3 & 3.0 & 10.2 \\
+     & random & 36\% & 5.7 & 4.0 & 12.0 \\
+     & deepfool & 35\% & 2.1 & 2.0 & 4.3 \\
+     & multi\_deepfool & 35\% & 4.2 & 3.0 & 13.4 \\
+    \hline
+    \multirow{4}{*}{adv} & clean & 38\% & 3.7 & 3.0 & 8.0 \\
+     & random & 38\% & 4.2 & 3.0 & 9.0 \\
+     & deepfool & 37\% & 1.6 & 1.0 & 4.2 \\
+     & multi\_deepfool & 37\% & 2.9 & 2.0 & 9.0 \\
+    \hline
+    \multirow{4}{*}{weak\_adv} & clean & 42\% & 5.1 & 3.0 & 13.0 \\
+     & random & 42\% & 5.7 & 4.0 & 17.0 \\
+     & deepfool & 42\% & 2.4 & 1.0 & 9.0 \\
+     & multi\_deepfool & 42\% & 4.3 & 2.0 & 17.0 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+表\ref{table:cifar10_misclassification}より，以下の知見が得られる：
+\begin{itemize}
+    \item ほぼ全てのモデル・初期化手法の組み合わせで35\%以上の誤分類達成率を示し，特にadvモデルはMNISTのもの（誤分類達成率0\%）と比較して攻撃が容易である．
+    \item \textbf{nat}：全ての初期化手法で誤分類達成率100\%を示した．DeepFool初期化は初期点の時点で誤分類を達成しており，次いでMulti-DeepFool初期化（平均0.3反復），ランダム初期化（平均1.2反復），クリーン初期化（平均1.5反復）の順である．
+    \item \textbf{nat\_and\_adv}：全ての初期化手法で誤分類達成率35〜36\%を示した．DeepFool初期化が最も高速（平均2.1反復）で，Multi-DeepFool初期化（平均4.2反復），クリーン初期化（平均4.3反復），ランダム初期化（平均5.7反復）の順である．MNISTと同様にランダム初期化が非常に遅い．
+    \item \textbf{adv}：MNISTのadvモデル（0\%）とは対照的に，全ての初期化手法で37〜38\%の誤分類達成率を示した．DeepFool初期化が最も高速（平均1.6反復）で，Multi-DeepFool初期化（平均2.9反復），クリーン初期化（平均3.7反復），ランダム初期化（平均4.2反復）の順である．
+    \item \textbf{weak\_adv}：全ての初期化手法で誤分類達成率42\%を示し，MNISTのweak\_advモデル（98〜100\%）と比較して低い．DeepFool初期化が最も高速（平均2.4反復）で，Multi-DeepFool初期化（平均4.3反復），クリーン初期化（平均5.1反復），ランダム初期化（平均5.7反復）の順である．
+\end{itemize}
+
+\section{総合考察}
+\label{sec:discussion}
+
+本節では，損失曲線の観察（第\ref{sec:loss_curve_observation}節）および誤分類達成反復数の定量分析（第\ref{sec:misclassification_analysis}節）の結果を総合的に考察する．
+
+\subsection{Madryらの実験の再現性}
+ランダム初期化PGD攻撃において，Madryらが報告した「異なる初期点から開始しても同程度の局所最大解に収束する」という観察が再現された．損失曲線（図\ref{fig:mnist_nat_random}，\ref{fig:cifar10_nat_random}）では，20回の試行が異なる初期点から開始しているにもかかわらず，いずれも同程度の損失値に収束している．
+
+\subsection{データセット間の比較}
+CIFAR10はMNISTと比較して桁違いに高速な誤分類が観察された．表\ref{table:mnist_misclassification}および表\ref{table:cifar10_misclassification}より：
+\begin{itemize}
+    \item MNISTのnatモデル：ランダム初期化で平均5.4反復，クリーン初期化で平均9.4反復
+    \item CIFAR10のnatモデル：ランダム初期化で平均1.2反復，クリーン初期化で平均1.5反復
+\end{itemize}
+
+CIFAR10のnatモデルに対するランダム初期化では，全試行が反復1--2で誤分類を達成している（図\ref{fig:cifar10_nat_random}）．この高速性の要因として，CIFAR10（$32 \times 32 \times 3 = 3072$次元）がMNIST（$28 \times 28 \times 1 = 784$次元）より高次元であり，攻撃可能な方向の自由度が高いこと，および決定境界が入力点から近い位置に存在することが考えられる．
+
+\subsection{モデル間の比較}
+敵対的訓練の効果がMNISTとCIFAR10で大きく異なる結果となった．
+
+\begin{itemize}
+    \item \textbf{MNIST}：nat，weak\_adv，nat\_and\_adv，advの順で誤分類達成率が高く，敵対的訓練の強度に応じた堅牢性の階層が観察された．
+    \item \textbf{CIFAR10}：nat，weak\_adv，adv，nat\_and\_advの順となり，nat\_and\_advが最も低い誤分類達成率（35--36\%）を示した．
+\end{itemize}
+MNISTでは敵対的訓練の強度に応じた堅牢性の階層が明確に観察された一方，CIFAR10では敵対的訓練を行った3モデル間の誤分類達成率の差が小さい（35--42\%）．これはCIFAR10の$\varepsilon = 8/255 \approx 3\%$がMNISTの$\varepsilon = 0.3$（30\%）と比較して非常に小さく，敵対的訓練の効果が限定的であることを示唆している．
+
+\subsection{初期化手法の効果}
+初期化手法の効果は，モデルの堅牢性に強く依存する：
+\begin{itemize}
+    \item \textbf{脆弱なモデル（nat）}：DeepFool初期化およびMulti-DeepFool初期化により反復0〜1で誤分類を達成している．MNISTのnatモデルでは，DeepFool初期化（平均0.0反復）とMulti-DeepFool初期化（平均0.5反復）がランダム初期化（平均5.4反復）より大幅に高速である．
+    \item \textbf{堅牢なモデル（MNIST adv）}：どの初期化手法を用いても100反復以内に誤分類を達成できない（誤分類達成率0\%）．損失曲線（図\ref{fig:mnist_adv_random}，\ref{fig:mnist_adv_deepfool}，\ref{fig:mnist_adv_mdf}）においても損失値は$10^{-5}$〜$10^{-2}$程度と非常に小さい範囲に留まる．
+    \item \textbf{中間的なモデル（nat\_and\_adv）}：ランダム初期化の性能が他の初期化手法と比較して著しく低い（MNISTで誤分類達成率5\%，平均28.2反復，CIFAR10で誤分類達成率36\%，平均5.7反復）．
+\end{itemize}
+
+nat\_and\_advでランダム初期化の性能が低い理由として，nat\_and\_advはクリーンデータと敵対的サンプルの両方で訓練されているため，$\ell_\infty$制約内の広い領域で正しく分類できるように決定境界が形成されていると考えられる．ランダム初期化はその領域内のランダムな点から始まるため，勾配の方向が分散しやすく決定境界を超えにくい．一方，DeepFool初期化は決定境界の方向を直接探索するため効率的であると考えられる．
+
+DeepFool初期化およびMulti-DeepFool初期化の効果は「$\ell_\infty$制約内で決定境界を超えた状態から攻撃を開始する」という性質に由来する．堅牢なモデルでは，DeepFoolが$\ell_\infty$制約内で決定境界を超えることができないため，初期化手法の効果が発揮されないと考えられる．すなわち，DeepFool初期化およびMulti-DeepFool初期化は，PGD攻撃が有効に機能するための前提条件として「$\ell_\infty$制約内で決定境界を超えられること」が必要であり，堅牢なモデルに対しては効果が限定的であるとわかる．
+
+\subsection{実用上の示唆}
+本実験結果から，PGD攻撃によるロバスト性評価について以下の示唆が得られた：
+\begin{itemize}
+    \item 堅牢なモデル（MNIST adv）に対しては，100反復のPGD攻撃でも誤分類を達成できない．より長い反復数や他の攻撃手法の検討が必要である．
+    \item CIFAR10のような高次元データでは，誤分類が数反復以内に達成されるため，反復数よりも攻撃の成否（誤分類達成率）が重要な指標となる．
+    \item 脆弱なモデルに対しては，DeepFool初期化を用いることで反復0〜1で誤分類を達成でき，誤分類達成反復数のみを評価する場合は有効な初期化手法である．
+    \item Multi-DeepFool初期化は，DeepFool初期化と比べて約ラベル数分の多様な探索が可能であるが，その分誤分類達成反復数が増加する傾向がある．
+\end{itemize}
+
+なお，各初期化手法の計算コストの比較は付録\ref{appendix:computational_cost}に示すこととする．

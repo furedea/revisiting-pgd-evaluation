@@ -34,3 +34,70 @@ Thumbs.db
 *.tmp
 *.temp
 
+# ===== LaTeX build artifacts =====
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.brf
+*.fls
+*.fdb_latexmk
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.synctex.gz(busy)
+*.toc
+
+# ===== Intermediate / converted =====
+*.dvi
+*.ps
+*.xdv
+
+# ===== Bibliography / indexing / glossaries =====
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+*.loa
+*.lol
+*.nlo
+*.ntn
+*.nls
+*.xdy
+
+# ===== TikZ/PGFplots cache =====
+*.tikz
+**/tikzexternalize/
+**/pgfplots_cache/
+
+# ===== minted (requires -shell-escape) =====
+_minted*/
+*.pyg
+
+# ===== latexmk / arara =====
+.latexmkrc
+*.ltx
+*.arara.cache
+
+# ===== (Optional) output PDFs are usually build artifacts =====
+# If you want to version PDFs, comment these out.
+*.pdf
+
+# ===== (Optional) keep build dir untracked =====
+build/
+out/
+dist/
+
+*.npy
+*.png
+docs/卒論/figure/
+*.txt

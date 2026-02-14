@@ -1,27 +1,29 @@
 """Pipeline orchestration for PGD visualization."""
 
 import argparse
+import json
 import os
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 
-from .cli import format_base_name, format_title
-from .data_loader import load_test_data
-from .deepfool import build_deepfool_init
-from .dto import ExamplePanel, InitSanityMetrics, ModelOps
-from .logging_config import LOGGER
-from .math_utils import linf_distance
-from .model_loader import (
+from src.cli import format_base_name, format_title, get_model_tag
+from src.data_loader import load_test_data
+from src.deepfool import build_deepfool_init
+from src.dto import ExamplePanel, InitSanityMetrics, ModelOps
+from src.logging_config import LOGGER
+from src.math_utils import linf_distance
+from src.model_loader import (
     create_tf_session,
     instantiate_model,
     load_model_module,
     restore_checkpoint,
 )
-from .pgd import choose_show_restart, run_pgd_batch
-from .plot_panel import plot_panels
-from .plot_save import save_panel_outputs
+from src.multi_deepfool import run_multi_deepfool_init_pgd
+from src.pgd import choose_show_restart, run_pgd_batch
+from src.plot_panel import plot_panels
+from src.plot_save import format_panel_metadata, save_panel_outputs
 
 
 def print_clean_diagnostics(
@@ -138,18 +140,44 @@ def find_correct_indices(
     return tuple(int(i) for i in found_indices)
 
 
-def run_check_only(
+def load_common_indices(file_path: str) -> List[int]:
+    """Load pre-computed common correct indices from JSON file."""
+    with open(file_path) as f:
+        data = json.load(f)
+    # Support both old key (common_correct_indices) and new key (selected_indices)
+    if "selected_indices" in data:
+        return data["selected_indices"]
+    return data["common_correct_indices"]
+
+
+def select_indices_from_common(
     sess: tf.compat.v1.Session,
     ops: ModelOps,
     x_test: np.ndarray,
     y_test: np.ndarray,
+    common_indices: List[int],
+    k: int,
     start_idx: int,
-) -> None:
-    """Run check-only mode to verify model loading."""
-    x_nat = x_test[start_idx : start_idx + 1].astype(np.float32)
-    y_nat = y_test[start_idx : start_idx + 1].astype(np.int64)
-    print_clean_diagnostics(sess, ops, x_nat, y_nat)
-    LOGGER.info({"action": "exit", "reason": "check_only"})
+) -> Tuple[int, ...]:
+    """Select k indices from common correct indices, verifying they are correct for this model."""
+    found_indices = []
+    for idx in common_indices:
+        if idx < start_idx:
+            continue
+        x = x_test[idx : idx + 1]
+        y = y_test[idx : idx + 1]
+        pred = sess.run(ops.y_pred_op, feed_dict={ops.x_ph: x, ops.y_ph: y})
+        if int(pred[0]) == int(y.reshape(-1)[0]):
+            found_indices.append(idx)
+            if len(found_indices) >= k:
+                break
+
+    if len(found_indices) < k:
+        raise RuntimeError(
+            f"Could not find {k} correct examples from common indices (found {len(found_indices)})."
+        )
+
+    return tuple(int(i) for i in found_indices)
 
 
 def run_one_example(
@@ -166,11 +194,60 @@ def run_one_example(
 
     print_clean_diagnostics(sess, ops, x_nat, y_nat)
 
-    do_clip = not bool(args.no_clip)
-
     x_df = None
     x_init = None
     init_jitter = 0.0
+
+    if args.init == "multi_deepfool":
+        # Multi-DeepFool branch: runs its own DeepFool + PGD pipeline
+        sanity = log_init_sanity(
+            sess=sess,
+            ops=ops,
+            x_nat=x_nat,
+            y_nat=y_nat,
+            x_df=None,
+            x_init=None,
+            eps=float(args.epsilon),
+        )
+
+        pgd = run_multi_deepfool_init_pgd(
+            sess=sess,
+            ops=ops,
+            x_nat=x_nat,
+            y_nat=y_nat,
+            eps=float(args.epsilon),
+            alpha=float(args.alpha),
+            total_iter=int(args.total_iter),
+            num_restarts=int(args.num_restarts),
+            df_max_iter=int(args.df_max_iter),
+            df_overshoot=float(args.df_overshoot),
+            seed=int(args.seed),
+        )
+
+        show_restart = choose_show_restart(pgd)
+        x_adv_show = pgd.x_adv_final[show_restart : show_restart + 1].astype(np.float32)
+        pred_end = int(pgd.preds[show_restart, -1])
+
+        wrong_end = int(np.sum(~pgd.corrects[:, -1]))
+        loss_end = pgd.losses[:, -1]
+        LOGGER.info(
+            f"[pgd] wrong_end={wrong_end}/{int(args.num_restarts)} "
+            f"loss_end(med/min/max)={float(np.median(loss_end)):.4g}/"
+            f"{float(np.min(loss_end)):.4g}/{float(np.max(loss_end)):.4g}"
+        )
+
+        return ExamplePanel(
+            x_nat=x_nat,
+            y_nat=y_nat,
+            x_adv_show=x_adv_show,
+            show_restart=int(show_restart),
+            pred_end=int(pred_end),
+            pgd=pgd,
+            sanity=sanity,
+            x_init=pgd.x_init,
+            x_init_rank=pgd.x_init_rank,
+            test_idx=int(idx),
+        )
 
     if args.init == "deepfool":
         x_df, x_init = build_deepfool_init(
@@ -178,7 +255,6 @@ def run_one_example(
             ops=ops,
             x_nat=x_nat,
             y_nat=y_nat,
-            do_clip=do_clip,
             df_max_iter=int(args.df_max_iter),
             df_overshoot=float(args.df_overshoot),
             df_project=str(getattr(args, "df_project", "clip")),
@@ -203,10 +279,9 @@ def run_one_example(
         y_nat=y_nat,
         eps=float(args.epsilon),
         alpha=float(args.alpha),
-        steps=int(args.steps),
+        total_iter=int(args.total_iter),
         num_restarts=int(args.num_restarts),
         seed=int(args.seed),
-        do_clip=do_clip,
         init=str(args.init),
         x_init=x_init,
         init_jitter=init_jitter,
@@ -232,6 +307,7 @@ def run_one_example(
         pred_end=int(pred_end),
         pgd=pgd,
         sanity=sanity,
+        x_init=pgd.x_init,
     )
 
 
@@ -255,15 +331,57 @@ def save_all_outputs(
     base: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> None:
-    """Save all panel outputs to files."""
+    """Save all panel outputs (arrays, images, metadata) to subdirectories."""
+    # Save arrays and images for each panel
     for i, panel in enumerate(panels, start=1):
         save_panel_outputs(
             out_dir=str(args.out_dir),
+            exp_name=str(args.exp_name),
             base=str(base),
             dataset=str(args.dataset),
             panel_index=int(i),
             panel=panel,
+            no_png=bool(args.no_png),
         )
+
+    # Save unified metadata file
+    metadata_dir = os.path.join(args.out_dir, "metadata", args.exp_name)
+    os.makedirs(metadata_dir, exist_ok=True)
+    meta_txt = os.path.join(metadata_dir, f"{base}_meta.txt")
+
+    df_params = ""
+    if args.init == "deepfool":
+        df_params = (
+            f"df_max_iter={args.df_max_iter}\n"
+            f"df_overshoot={args.df_overshoot}\n"
+            f"df_jitter={args.df_jitter}\n"
+            f"df_project={args.df_project}\n"
+        )
+    elif args.init == "multi_deepfool":
+        df_params = (
+            f"df_max_iter={args.df_max_iter}\n"
+            f"df_overshoot={args.df_overshoot}\n"
+        )
+
+    content = (
+        "[PARAMETERS]\n"
+        f"dataset={args.dataset}\n"
+        f"epsilon={args.epsilon}\n"
+        f"alpha={args.alpha}\n"
+        f"total_iter={args.total_iter}\n"
+        f"num_restarts={args.num_restarts}\n"
+        f"seed={args.seed}\n"
+        f"init={args.init}\n"
+        f"{df_params}\n"
+    )
+
+    for i, panel in enumerate(panels, start=1):
+        content += format_panel_metadata(panel, i, args)
+
+    with open(meta_txt, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    LOGGER.info(f"[save] metadata={meta_txt}")
 
 
 def render_figure(
@@ -272,14 +390,15 @@ def render_figure(
     title: str,
     panels: Tuple[ExamplePanel, ...],
 ) -> str:
-    """Render and save the figure."""
-    out_png = os.path.join(args.out_dir, f"{base}.png")
+    """Render and save the figure to figures/ subdirectory."""
+    figures_dir = os.path.join(args.out_dir, "figures", args.exp_name)
+    os.makedirs(figures_dir, exist_ok=True)
+    out_png = os.path.join(figures_dir, f"{base}.png")
     plot_panels(
         dataset=str(args.dataset),
         panels=panels,
         out_png=out_png,
         title=str(title),
-        alpha_line=float(args.alpha_line),
         init_sanity_plot=bool(args.init_sanity_plot) and (str(args.init) == "deepfool"),
         eps=float(args.epsilon),
     )
@@ -303,36 +422,54 @@ def run_pipeline(args: argparse.Namespace) -> None:
         restore_checkpoint(sess, saver, str(args.ckpt_dir))
         x_test, y_test = load_test_data(str(args.dataset), model_src_dir)
 
-        if bool(args.check_only):
-            run_check_only(sess, ops, x_test, y_test, int(args.start_idx))
-            return
-
-        indices = find_correct_indices(
-            sess=sess,
-            ops=ops,
-            x_test=x_test,
-            y_test=y_test,
-            k=int(args.n_examples),
-            start_idx=int(args.start_idx),
-            max_tries=int(args.max_tries),
-        )
+        if args.common_indices_file:
+            common_indices = load_common_indices(str(args.common_indices_file))
+            indices = select_indices_from_common(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                common_indices=common_indices,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+            )
+        else:
+            indices = find_correct_indices(
+                sess=sess,
+                ops=ops,
+                x_test=x_test,
+                y_test=y_test,
+                k=int(args.n_examples),
+                start_idx=int(args.start_idx),
+                max_tries=int(args.max_tries),
+            )
         base = format_base_name(args, indices)
         title = format_title(args)
+        tag = get_model_tag(str(args.ckpt_dir))
 
-        df_part = (
-            f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot} df_jitter={args.df_jitter}"
-            if args.init == "deepfool"
-            else ""
-        )
+        if args.init == "deepfool":
+            df_part = (
+                f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot}"
+                f" df_jitter={args.df_jitter}"
+            )
+        elif args.init == "multi_deepfool":
+            df_part = (
+                f" df_iter={args.df_max_iter} df_overshoot={args.df_overshoot}"
+            )
+        else:
+            df_part = ""
         LOGGER.info(
-            f"[run] dataset={args.dataset} indices={indices} tag={args.tag} init={args.init}"
-            f" eps={args.epsilon} alpha={args.alpha} steps={args.steps} restarts={args.num_restarts}"
+            f"[run] dataset={args.dataset} indices={indices} tag={tag} init={args.init}"
+            f" eps={args.epsilon} alpha={args.alpha} total_iter={args.total_iter} restarts={args.num_restarts}"
             f" seed={args.seed}{df_part} out={args.out_dir}"
         )
 
         panels = run_all_examples(args, sess, ops, x_test, y_test, indices)
 
     save_all_outputs(args, base, panels)
-    out_png = render_figure(args, base, title, panels)
 
-    LOGGER.info(f"[done] figure={out_png}")
+    if not args.no_png:
+        out_png = render_figure(args, base, title, panels)
+        LOGGER.info(f"[done] figure={out_png}")
+    else:
+        LOGGER.info("[done] PNG generation skipped (--no_png)")

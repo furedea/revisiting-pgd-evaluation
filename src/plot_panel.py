@@ -8,16 +8,16 @@ from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import ScalarFormatter
 
-from .dto import ExamplePanel
-from .logging_config import LOGGER
-from .plot_setup import (
+from src.dto import ExamplePanel
+from src.logging_config import LOGGER
+from src.plot_setup import (
     add_correctness_legend,
     add_sanity_legend,
     finalize_figure,
     setup_figure,
     should_show_sanity_row,
 )
-from .plot_sanity import plot_sanity_row
+from src.plot_sanity import plot_sanity_row
 
 
 def plot_single_panel(
@@ -26,7 +26,6 @@ def plot_single_panel(
     col: int,
     panel: ExamplePanel,
     dataset: str,
-    alpha_line: float,
 ) -> None:
     """Plot a single panel (loss curves, correctness heatmap, images)."""
     cmap = ListedColormap(["#440154", "#FDE725"])
@@ -37,7 +36,7 @@ def plot_single_panel(
 
     ax1 = fig.add_subplot(gs[0, col])
     for r in range(restarts):
-        ax1.plot(xs, losses[r], linewidth=1, alpha=float(alpha_line))
+        ax1.plot(xs, losses[r], linewidth=1, alpha=0.9)
     ax1.set_xlabel("PGD Iterations")
     ax1.set_ylabel("Cross-entropy Loss" if col == 0 else "")
     ax1.tick_params(labelbottom=True)
@@ -59,19 +58,35 @@ def plot_single_panel(
         vmax=1,
     )
     ax2.set_xlabel("PGD Iterations")
-    ax2.set_ylabel("restart (run)" if col == 0 else "")
-    ax2.set_yticks([0, restarts - 1])
-    ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
+    # Heatmap y-axis: show label and ticks
+    if restarts == 1:
+        ax2.set_ylabel("restart (run)" if col == 0 else "")
+        ax2.set_yticks([0])
+        ax2.set_yticklabels(["0"] if col == 0 else [""])
+    else:
+        ax2.set_ylabel("restart (run)" if col == 0 else "")
+        ax2.set_yticks([0, restarts - 1])
+        ax2.set_yticklabels(["0", str(restarts - 1)] if col == 0 else ["", ""])
     ax2.tick_params(labelbottom=True)
 
-    sub = gs[2, col].subgridspec(1, 2, wspace=0.08)
+    # Display 3 images if x_init exists, otherwise 2
+    num_imgs = 3 if panel.x_init is not None else 2
+    sub = gs[2, col].subgridspec(1, num_imgs, wspace=0.08)
     ax3a = fig.add_subplot(sub[0, 0])
-    ax3b = fig.add_subplot(sub[0, 1])
+    if num_imgs == 3:
+        ax3b = fig.add_subplot(sub[0, 1])
+        ax3c = fig.add_subplot(sub[0, 2])
+    else:
+        ax3c = fig.add_subplot(sub[0, 1])
 
     ax3a.axis("off")
-    ax3b.axis("off")
+    ax3c.axis("off")
     ax3a.set_title("x_nat", fontsize=11, pad=6)
-    ax3b.set_title("x_adv", fontsize=11, pad=6)
+    ax3c.set_title("x_adv", fontsize=11, pad=6)
+
+    if num_imgs == 3:
+        ax3b.axis("off")
+        ax3b.set_title("x_init", fontsize=11, pad=6)
 
     if dataset == "mnist":
         ax3a.imshow(
@@ -80,7 +95,14 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        ax3b.imshow(
+        if num_imgs == 3 and panel.x_init is not None:
+            ax3b.imshow(
+                np.squeeze(panel.x_init).reshape(28, 28),
+                cmap="gray",
+                vmin=0.0,
+                vmax=1.0,
+            )
+        ax3c.imshow(
             np.squeeze(panel.x_adv_show).reshape(28, 28),
             cmap="gray",
             vmin=0.0,
@@ -92,7 +114,13 @@ def plot_single_panel(
             vmin=0.0,
             vmax=1.0,
         )
-        ax3b.imshow(
+        if num_imgs == 3 and panel.x_init is not None:
+            ax3b.imshow(
+                np.clip(np.squeeze(panel.x_init).reshape(32, 32, 3), 0.0, 1.0),
+                vmin=0.0,
+                vmax=1.0,
+            )
+        ax3c.imshow(
             np.clip(np.squeeze(panel.x_adv_show).reshape(32, 32, 3), 0.0, 1.0),
             vmin=0.0,
             vmax=1.0,
@@ -104,19 +132,19 @@ def plot_panels(
     panels: Tuple[ExamplePanel, ...],
     out_png: str,
     title: str,
-    alpha_line: float,
     init_sanity_plot: bool,
     eps: float,
 ) -> None:
     """Plot all panels and save to file."""
     num_panels = int(len(panels))
+    num_restarts = int(panels[0].pgd.losses.shape[0])
     show_sanity_row = should_show_sanity_row(panels, init_sanity_plot, eps)
 
-    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row)
+    fig, gs, nrows = setup_figure(num_panels, title, show_sanity_row, num_restarts)
     add_correctness_legend(fig)
 
     for col, panel in enumerate(panels):
-        plot_single_panel(fig, gs, col, panel, dataset, alpha_line)
+        plot_single_panel(fig, gs, col, panel, dataset)
 
     if show_sanity_row:
         plot_sanity_row(fig, gs, panels, eps)

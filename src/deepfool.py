@@ -5,9 +5,9 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-from .dto import ModelOps
-from .logging_config import LOGGER
-from .math_utils import clip_to_unit_interval, project_linf, scale_to_linf_ball
+from src.dto import ModelOps
+from src.logging_config import LOGGER
+from src.math_utils import clip_to_unit_interval, project_linf, scale_to_linf_ball
 
 
 def deepfool_init_point(
@@ -65,8 +65,12 @@ def deepfool_init_point(
             break
 
         r = best_r_flat.reshape(x.shape[1:])
-        x = x + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+        x = x + r[np.newaxis, ...]
         x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
+
+    # Apply overshoot once at the end (per original paper)
+    x = x0 + (1.0 + float(overshoot)) * (x - x0)
+    x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
     return x.astype(np.float32)
 
@@ -128,10 +132,14 @@ def deepfool_init_point_with_trace(
             break
 
         r = best_r_flat.reshape(x.shape[1:])
-        x = x + (1.0 + float(overshoot)) * r[np.newaxis, ...]
+        x = x + r[np.newaxis, ...]
         x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
         trace.append(x.copy())
+
+    # Apply overshoot once at the end (per original paper)
+    x = x0 + (1.0 + float(overshoot)) * (x - x0)
+    x = np.clip(x, float(clip_min), float(clip_max)).astype(np.float32)
 
     return x.astype(np.float32), tuple(trace)
 
@@ -143,7 +151,6 @@ def select_maxloss_within_eps(
     x_nat: np.ndarray,
     y_nat: np.ndarray,
     eps: float,
-    do_clip: bool,
     project: str = "clip",
 ) -> Tuple[Optional[np.ndarray], Optional[float]]:
     """Pick argmax loss among projected points onto Linf-ball."""
@@ -161,7 +168,7 @@ def select_maxloss_within_eps(
         else:
             raise ValueError(f"Unknown project: {project}")
 
-        x_proj = clip_to_unit_interval(x_proj) if bool(do_clip) else x_proj
+        x_proj = clip_to_unit_interval(x_proj)
 
         loss_vec = sess.run(
             ops.per_ex_loss_op,
@@ -181,7 +188,6 @@ def build_deepfool_init(
     ops: ModelOps,
     x_nat: np.ndarray,
     y_nat: np.ndarray,
-    do_clip: bool,
     df_max_iter: int,
     df_overshoot: float,
     df_project: str,
@@ -228,7 +234,6 @@ def build_deepfool_init(
             x_nat=x_nat,
             y_nat=y_nat,
             eps=eps,
-            do_clip=do_clip,
         )
         if best_x is None:
             LOGGER.info("[deepfool] maxloss: no trace point within eps; fallback to scale")
@@ -241,5 +246,5 @@ def build_deepfool_init(
     else:
         raise ValueError(f"Unknown df_project: {df_project}")
 
-    x_init = clip_to_unit_interval(x_init) if bool(do_clip) else x_init
+    x_init = clip_to_unit_interval(x_init)
     return x_df, x_init

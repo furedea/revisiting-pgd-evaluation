@@ -1,0 +1,56 @@
+\documentclass[autodetect-engine, dvipdfmx-if-dvi, ja=standard, a4paper, 12pt]{qu_graduate}
+\usepackage{graphicx}
+\usepackage{subcaption}
+
+\usepackage{amsmath,amssymb,amsthm,bm,fancybox,makeidx,url,here,ascmac,comment}
+\usepackage{mathrsfs}
+\usepackage{txfonts}
+\usepackage{enumerate}
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\setcounter{tocdepth}{2}
+
+\title{
+画像分類モデルへのPGD攻撃における\\初期化手法の検証
+}
+
+\author{著者名}
+\date{令和X年X月}
+\major{電気情報工学科}
+\department{九州大学　工学部　電気情報工学科}
+
+\begin{document}
+
+	\theoremstyle{definition}
+	\newtheorem{theorem}{定理}
+	\newtheorem*{theorem*}{定理}
+	\newtheorem{definition}[theorem]{定義}
+	\newtheorem*{definition*}{定義}
+
+	\frontmatter
+
+	\maketitle
+
+	\tableofcontents
+
+	\mainmatter
+
+	\newtheorem{theo}{定理}
+	\newtheorem{defi}{定義}
+	\newtheorem{lemm}{補題}
+	\newtheorem{prop}{性質}
+
+	\include{chapter/01_Introduction}
+	\include{chapter/02_RelatedWork}
+	\include{chapter/03_EvaluationMethod}
+	\include{chapter/04_ProposedMethod}
+	\include{chapter/05_Experiment}
+	\include{chapter/06_Conclusion}
+	\include{chapter/Appendix_ComputationalCost}
+	\include{chapter/Appendix_LossCurves}
+	\include{chapter/07_Acknowledgement}
+	\input{chapter/08_Reference}
+
+\end{document}

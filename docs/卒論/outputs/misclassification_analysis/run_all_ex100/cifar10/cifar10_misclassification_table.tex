@@ -1,0 +1,33 @@
+\begin{table}[H]
+  \caption{CIFAR10における誤分類統計（100サンプル平均）}
+  \label{table:cifar10_misclassification_ex100}
+  \centering
+  \small
+  \begin{tabular}{l|l|cccc}
+    \hline
+    & & & \multicolumn{3}{c}{誤分類達成反復数} \\
+    \cline{4-6}
+    モデル & 初期化 & 誤分類達成率 & 平均 & 中央値 & P95 \\
+    \hline
+    \multirow{4}{*}{nat} & clean & 100\% & 1.5 & 1.0 & 2.0 \\
+     & random & 100\% & 1.2 & 1.0 & 2.0 \\
+     & deepfool & 100\% & 0.0 & 0.0 & 0.0 \\
+     & multi\_deepfool & 100\% & 0.3 & 0.0 & 1.0 \\
+    \hline
+    \multirow{4}{*}{nat\_and\_adv} & clean & 36\% & 4.3 & 3.0 & 10.2 \\
+     & random & 36\% & 5.7 & 4.0 & 12.0 \\
+     & deepfool & 35\% & 2.1 & 2.0 & 4.3 \\
+     & multi\_deepfool & 35\% & 4.2 & 3.0 & 13.4 \\
+    \hline
+    \multirow{4}{*}{adv} & clean & 38\% & 3.7 & 3.0 & 8.0 \\
+     & random & 38\% & 4.2 & 3.0 & 9.0 \\
+     & deepfool & 37\% & 1.6 & 1.0 & 4.2 \\
+     & multi\_deepfool & 37\% & 2.9 & 2.0 & 9.0 \\
+    \hline
+    \multirow{4}{*}{weak\_adv} & clean & 42\% & 5.1 & 3.0 & 13.0 \\
+     & random & 42\% & 5.7 & 4.0 & 17.0 \\
+     & deepfool & 42\% & 2.4 & 1.0 & 9.0 \\
+     & multi\_deepfool & 42\% & 4.3 & 2.0 & 17.0 \\
+    \hline
+  \end{tabular}
+\end{table}

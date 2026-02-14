@@ -1,0 +1,17 @@
+\begin{table}[H]
+  \caption{CIFAR10における初期化手法の実行時間比較}
+  \label{table:cifar10_timing_comparison}
+  \centering
+  \small
+  \begin{tabular}{c|l|ccc|c}
+    \hline
+    リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
+    \hline
+    \multirow{2}{*}{1} & ランダム & 0.0003 & 1.6764 & 1.6767 & 1.00 \\
+     & DeepFool & 1.4814 & 1.7380 & 3.2194 & 1.92 \\
+    \hline
+    \multirow{2}{*}{9} & ランダム & 0.0011 & 3.2598 & 3.2609 & 1.00 \\
+     & Multi-DeepFool & 9.7053 & 3.2585 & 12.9638 & 3.98 \\
+    \hline
+  \end{tabular}
+\end{table}

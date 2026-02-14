@@ -1,0 +1,181 @@
+\chapter{nat\_and\_advおよびweak\_advモデルの損失曲線}
+\label{appendix:loss_curves}
+
+本付録では，本文で省略したnat\_and\_advモデルおよびweak\_advモデルに対するPGD攻撃の損失曲線を示す．図の構成は本文（第\ref{sec:loss_curve_observation}節）と同様である．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ランダム初期化}
+
+\subsection{MNIST nat\_and\_advモデル}
+
+図\ref{fig:mnist_nat_and_adv_random}にMNIST nat\_and\_advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_and_adv_random.png}
+  \caption{MNIST nat\_and\_advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_and_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_and_adv_random}より，損失曲線を見ると，全サンプルで損失値は$10^{-4}$〜$10^{-3}$程度の非常に小さい範囲に留まっている．ヒートマップを見ると，全5サンプルにおいて20回の試行全てが100反復を通じて正分類（黄色）を維持しており，誤分類を達成した試行は存在しない．
+
+\subsection{MNIST weak\_advモデル}
+
+図\ref{fig:mnist_weak_adv_random}にMNIST weak\_advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_weak_adv_random.png}
+  \caption{MNIST weak\_advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_weak_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_weak_adv_random}より，損失曲線を見ると，全サンプルで損失は0付近から開始し，10〜30程度まで上昇している．ヒートマップを見ると，サンプル1, 3, 4, 5では全試行が反復20〜35程度で誤分類（紫色）を達成している．サンプル2では一部の試行（約5〜6試行）が100反復でも正分類を維持している．
+
+\subsection{CIFAR10 nat\_and\_advモデル}
+
+図\ref{fig:cifar10_nat_and_adv_random}にCIFAR10 nat\_and\_advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_and_adv_random.png}
+  \caption{CIFAR10 nat\_and\_advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_and_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_and_adv_random}より，損失曲線を見ると，サンプル1, 2, 4, 5では損失が0付近から1〜6程度まで急速に上昇している．サンプル3では損失が0.05程度と非常に低い範囲に留まっている．ヒートマップを見ると，サンプル1, 2, 4, 5では全試行が反復1〜15ほどで誤分類を達成している．サンプル3では全試行が100反復を通じて正分類を維持している．
+
+\subsection{CIFAR10 weak\_advモデル}
+
+図\ref{fig:cifar10_weak_adv_random}にCIFAR10 weak\_advモデルに対するランダム初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_weak_adv_random.png}
+  \caption{CIFAR10 weak\_advモデルに対するランダム初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線は異なる試行）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，ランダム初期化サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_weak_adv_random}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_weak_adv_random}より，損失曲線を見ると，サンプル1, 2, 4, 5では損失が0付近から3.5〜12程度まで急速に上昇している．サンプル3では損失が0.01程度と非常に低い範囲に留まっている．ヒートマップを見ると，サンプル1, 2, 4, 5では全試行が反復1〜10ほどで誤分類を達成している．サンプル3では全試行が100反復を通じて正分類を維持している．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{DeepFool初期化}
+
+\subsection{MNIST nat\_and\_advモデル}
+
+図\ref{fig:mnist_nat_and_adv_deepfool}にMNIST nat\_and\_advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_and_adv_deepfool.png}
+  \caption{MNIST nat\_and\_advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_and_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_and_adv_deepfool}より，損失曲線を見ると，サンプル1, 2, 4では損失が$10^{-4}$〜$10^{-3}$程度の非常に小さい範囲に留まっている．サンプル3, 5では損失が5〜8程度まで上昇している．ヒートマップを見ると，サンプル1, 2, 4は100反復を通じて正分類を維持している．サンプル3, 5は反復10付近で誤分類を達成している．
+
+\subsection{MNIST weak\_advモデル}
+
+図\ref{fig:mnist_weak_adv_deepfool}にMNIST weak\_advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_weak_adv_deepfool.png}
+  \caption{MNIST weak\_advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_weak_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_weak_adv_deepfool}より，損失曲線を見ると，全サンプルで損失は0付近から開始し，12〜22程度まで上昇している．ヒートマップを見ると，全サンプルで反復15〜30程度で誤分類を達成している．
+
+\subsection{CIFAR10 nat\_and\_advモデル}
+
+図\ref{fig:cifar10_nat_and_adv_deepfool}にCIFAR10 nat\_and\_advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_and_adv_deepfool.png}
+  \caption{CIFAR10 nat\_and\_advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_and_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_and_adv_deepfool}より，損失曲線を見ると，サンプル1, 2, 4, 5では損失が1〜6程度の値に達し，ほぼ横ばいで推移している．サンプル3では損失が0.05程度と非常に低い範囲に留まっている．ヒートマップを見ると，サンプル1, 2, 4, 5は反復1〜2程度で誤分類を達成している．サンプル3は100反復を通じて正分類を維持している．
+
+\subsection{CIFAR10 weak\_advモデル}
+
+図\ref{fig:cifar10_weak_adv_deepfool}にCIFAR10 weak\_advモデルに対するDeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_weak_adv_deepfool.png}
+  \caption{CIFAR10 weak\_advモデルに対するDeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，DeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_weak_adv_deepfool}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_weak_adv_deepfool}より，損失曲線を見ると，サンプル1, 2, 5では損失が3.5〜12程度の値まで上昇してからはほぼ横ばいで推移している．サンプル3では損失が0.01程度，サンプル4では損失が0.001程度と低い．ヒートマップを見ると，サンプル1, 2, 4, 5は反復1で誤分類を達成している．サンプル3, 4は100反復を通じて正分類を維持している．
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Multi-DeepFool初期化}
+
+\subsection{MNIST nat\_and\_advモデル}
+
+図\ref{fig:mnist_nat_and_adv_mdf}にMNIST nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_nat_and_adv_mdf.png}
+  \caption{MNIST nat\_and\_advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線の色は境界までの距離の順位を表す）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_nat_and_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_nat_and_adv_mdf}より，損失曲線を見ると，サンプル1, 2, 4では損失が$10^{-3}$〜$10^{-2}$程度の非常に小さい範囲に留まっている．サンプル3, 5では損失が2〜8程度まで上昇する試行がある．ヒートマップを見ると，サンプル1, 2, 4は全試行・全反復で正分類を維持している．サンプル3は高ランクになればなるほど誤分類しにくくなり上位の3ラベルについては正分類を維持している．サンプル5は誤分類，正分類が混在しているが，ランクの高低による明確な傾向は見られない．
+
+\subsection{MNIST weak\_advモデル}
+
+図\ref{fig:mnist_weak_adv_mdf}にMNIST weak\_advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/mnist_weak_adv_mdf.png}
+  \caption{MNIST weak\_advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線の色は境界までの距離の順位を表す）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:mnist_weak_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:mnist_weak_adv_mdf}より，損失曲線を見ると，全サンプルで損失は0付近から開始し，8〜25程度まで上昇している．ヒートマップを見ると，サンプル1, 3, 4, 5では全試行が反復20〜40程度で誤分類を達成している．サンプル2では一部の試行が100反復でも正分類を維持している．ランクの高低による明確な傾向は見られない．
+
+\subsection{CIFAR10 nat\_and\_advモデル}
+
+図\ref{fig:cifar10_nat_and_adv_mdf}にCIFAR10 nat\_and\_advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_nat_and_adv_mdf.png}
+  \caption{CIFAR10 nat\_and\_advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線の色は境界までの距離の順位を表す）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_nat_and_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_nat_and_adv_mdf}より，損失曲線を見ると，サンプル1, 2, 4, 5では損失が1〜7程度まで上昇しほぼ横ばいで推移している．サンプル3では損失が0.05程度と非常に低い範囲に留まっている．ヒートマップを見ると，サンプル1, 2, 4, 5はほぼ全試行が反復1〜5程度で誤分類を達成しているが，サンプル1の高ランクの試行において1度だけ70反復程度まで誤分類が行われていないケースが存在する．サンプル3は全試行が100反復を通じて正分類を維持している．
+
+\subsection{CIFAR10 weak\_advモデル}
+
+図\ref{fig:cifar10_weak_adv_mdf}にCIFAR10 weak\_advモデルに対するMulti-DeepFool初期化PGDの結果を示す．
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figure/cifar10_weak_adv_mdf.png}
+  \caption{CIFAR10 weak\_advモデルに対するMulti-DeepFool初期化PGD攻撃の結果．上段：損失曲線（横軸は反復数，縦軸は損失値，各線の色は境界までの距離の順位を表す）．中段：正誤ヒートマップ（黄色は正しい分類，紫色は誤分類）．下段：元画像，損失が最大となるDeepFool敵対的サンプル，PGD敵対的サンプルの比較．}
+  \label{fig:cifar10_weak_adv_mdf}
+\end{figure}
+
+\medskip
+図\ref{fig:cifar10_weak_adv_mdf}より，損失曲線を見ると，サンプル1, 2, 4, 5では損失が2〜12程度まで上昇し，ほぼ横ばいで推移している．サンプル3では損失が0.01程度と非常に低い範囲に留まっている．ヒートマップを見ると，サンプル1, 2, 5は反復0〜2で誤分類を達成している．サンプル4は反復2〜30程度で誤分類といった，ムラがあるがランクの高低による明確な傾向は見られない．サンプル3は全試行が100反復を通じて正分類を維持している．

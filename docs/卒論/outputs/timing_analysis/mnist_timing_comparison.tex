@@ -1,0 +1,17 @@
+\begin{table}[H]
+  \caption{MNISTにおける初期化手法の実行時間比較}
+  \label{table:mnist_timing_comparison}
+  \centering
+  \small
+  \begin{tabular}{c|l|ccc|c}
+    \hline
+    リスタート数 & 初期化手法 & 初期点生成 (s) & PGD (s) & 合計 (s) & 比率 \\
+    \hline
+    \multirow{2}{*}{1} & ランダム & 0.0002 & 0.2340 & 0.2341 & 1.00 \\
+     & DeepFool & 0.1139 & 0.2269 & 0.3408 & 1.46 \\
+    \hline
+    \multirow{2}{*}{9} & ランダム & 0.0004 & 0.2459 & 0.2463 & 1.00 \\
+     & Multi-DeepFool & 0.8394 & 0.2479 & 1.0874 & 4.42 \\
+    \hline
+  \end{tabular}
+\end{table}
