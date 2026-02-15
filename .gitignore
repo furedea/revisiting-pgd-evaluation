@@ -7,6 +7,10 @@ outputs/**
 model_src/**
 !model_src/.gitkeep
 
+docs/
+.claude/
+.kiro/
+
 __pycache__/
 *.py[cod]
 *.pyo
