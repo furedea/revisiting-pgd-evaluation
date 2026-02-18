@@ -5,7 +5,7 @@
 ## Overview
 
 PGD (Projected Gradient Descent) 攻撃に対するニューラルネットワークのロバスト性を，
-複数の初期化手法（Random，DeepFool，Multi-DeepFool）を用いて評価するツールキット．
+複数の初期化手法（Random，DeepFool，Multi-DeepFool）を用いて評価するツールキットです．
 
 主な機能:
 - PGD 攻撃の実行と損失曲線・正誤ヒートマップ・画像パネルの生成
