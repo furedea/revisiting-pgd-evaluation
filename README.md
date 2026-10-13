@@ -324,4 +324,4 @@ outputs/{exp_name}/{dataset}/{model}/{init}/
 
 ## License
 
-Kyushu University - Thesis Research Project
+This project is licensed under the [MIT License](LICENSE).
