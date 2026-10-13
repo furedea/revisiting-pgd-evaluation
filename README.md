@@ -1,5 +1,11 @@
 # Revisiting PGD Evaluation
 
+Code for a bachelor's thesis that revisits PGD-based robustness evaluation of neural networks, focusing on misclassification speed.
+It runs PGD attacks against naturally and adversarially trained MNIST / CIFAR-10 models from four starting points: random, DeepFool, Multi-DeepFool, and the clean input.
+For each run it records per-iteration losses and correctness, plots loss curves and correctness heatmaps, and measures initialization and attack time.
+Analysis scripts aggregate misclassification rates and timing across models and initialization methods.
+Built on TensorFlow 1.15 (`tf.compat.v1`) and runs in Docker.
+
 誤分類速度に着目した PGD 攻撃のロバスト性評価の再検証
 
 ## Overview
@@ -97,6 +103,8 @@ src/                           # コアモジュール（1ファイル = 1責務
   ├── model_loader.py          # モデル読み込み
   ├── dto.py                   # データ転送オブジェクト
   ├── math_utils.py            # 数学ユーティリティ
+  ├── plot_panel.py            # 損失曲線・正誤ヒートマップ・画像（x_nat / x_init / x_adv）のパネル描画
+  ├── plot_sanity.py           # DeepFool 初期化のサニティ行（L∞ 距離と損失）の描画
   ├── plot_setup.py            # 可視化設定
   ├── plot_save.py             # 可視化保存
   └── logging_config.py        # ロギング設定
@@ -110,8 +118,12 @@ run_timing_ex100.sh            # タイミング計測バッチ実行
 tests/                         # テストスイート
 outputs/                       # 実験結果出力（.gitignore）
 model_src/                     # 事前訓練モデル（.gitignore）
-docs/卒論/                     # 論文 LaTeX ソース
+docs/                          # ローカル専用（.gitignore，本リポジトリでは非公開）
 ```
+
+> `docs/` は `.gitignore` で除外されており，本リポジトリには含まれません．
+> 卒業論文の LaTeX ソースはローカルでのみ管理しており公開していません．
+> 共通正解インデックスの JSON（後述）もこのディレクトリに出力されるため，各自の環境で生成してください．
 
 ## Usage
 
@@ -135,7 +147,10 @@ python find_common_correct_samples.py \
     --n_samples 100
 ```
 
-出力：`docs/common_correct_indices_mnist_n100.json`
+出力：`docs/common_correct_indices_mnist_n100.json`（出力先は `--out_dir` で変更可能，デフォルトは `docs`）
+
+> `docs/` は `.gitignore` 対象のため，このファイルはリポジトリに含まれていません．
+> `--common_indices_file` に指定する前に，上記コマンドでローカルに生成してください．
 
 ### 2. PGD 攻撃の実行
 
