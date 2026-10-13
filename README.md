@@ -143,8 +143,8 @@ docs/                          # ローカル専用（.gitignore，本リポジ�
 ```bash
 python find_common_correct_samples.py \
     --dataset mnist \
-    --models nat adv nat_and_adv weak_adv \
-    --n_samples 100
+    --models nat,adv,nat_and_adv,weak_adv \
+    --samples_per_class 10
 ```
 
 出力：`docs/common_correct_indices_mnist_n100.json`（出力先は `--out_dir` で変更可能，デフォルトは `docs`）
