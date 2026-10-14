@@ -1,5 +1,11 @@
 # Revisiting PGD Evaluation
 
+Code for a bachelor's thesis that revisits PGD-based robustness evaluation of neural networks, focusing on misclassification speed.
+It runs PGD attacks against naturally and adversarially trained MNIST / CIFAR-10 models from four starting points: random, DeepFool, Multi-DeepFool, and the clean input.
+For each run it records per-iteration losses and correctness, plots loss curves and correctness heatmaps, and measures initialization and attack time.
+Analysis scripts aggregate misclassification rates and timing across models and initialization methods.
+Built on TensorFlow 1.15 (`tf.compat.v1`) and runs in Docker.
+
 誤分類速度に着目した PGD 攻撃のロバスト性評価の再検証
 
 ## Overview
@@ -7,7 +13,8 @@
 PGD (Projected Gradient Descent) 攻撃に対するニューラルネットワークのロバスト性を，
 複数の初期化手法（Random，DeepFool，Multi-DeepFool）を用いて評価するツールキットです．
 
-主な機能:
+主な機能：
+
 - PGD 攻撃の実行と損失曲線・正誤ヒートマップ・画像パネルの生成
 - DeepFool / Multi-DeepFool 初期化による多様な摂動開始点の評価
 - 初期化手法ごとの実行時間計測
@@ -71,7 +78,7 @@ docker run --platform linux/amd64 --gpus all --rm \
 ### ローカル環境
 
 Docker を使わない場合は，TF 1.15.5 をサポートする x86_64 Linux 環境で
-以下をインストールしてください:
+以下をインストールしてください：
 
 ```bash
 pip install tensorflow==1.15.5 tqdm pytest
@@ -96,6 +103,8 @@ src/                           # コアモジュール（1ファイル = 1責務
   ├── model_loader.py          # モデル読み込み
   ├── dto.py                   # データ転送オブジェクト
   ├── math_utils.py            # 数学ユーティリティ
+  ├── plot_panel.py            # 損失曲線・正誤ヒートマップ・画像（x_nat / x_init / x_adv）のパネル描画
+  ├── plot_sanity.py           # DeepFool 初期化のサニティ行（L∞ 距離と損失）の描画
   ├── plot_setup.py            # 可視化設定
   ├── plot_save.py             # 可視化保存
   └── logging_config.py        # ロギング設定
@@ -109,8 +118,12 @@ run_timing_ex100.sh            # タイミング計測バッチ実行
 tests/                         # テストスイート
 outputs/                       # 実験結果出力（.gitignore）
 model_src/                     # 事前訓練モデル（.gitignore）
-docs/卒論/                     # 論文 LaTeX ソース
+docs/                          # ローカル専用（.gitignore，本リポジトリでは非公開）
 ```
+
+> `docs/` は `.gitignore` で除外されており，本リポジトリには含まれません．
+> 卒業論文の LaTeX ソースはローカルでのみ管理しており公開していません．
+> 共通正解インデックスの JSON（後述）もこのディレクトリに出力されるため，各自の環境で生成してください．
 
 ## Usage
 
@@ -125,20 +138,23 @@ docs/卒論/                     # 論文 LaTeX ソース
 ### 1. 共通正解サンプルの特定
 
 全モデルが正しく分類するサンプルのインデックスを事前に計算します．
-この結果は PGD 攻撃とタイミング計測の両方で `--common_indices_file` として使用します:
+この結果は PGD 攻撃とタイミング計測の両方で `--common_indices_file` として使用します：
 
 ```bash
 python find_common_correct_samples.py \
     --dataset mnist \
-    --models nat adv nat_and_adv weak_adv \
-    --n_samples 100
+    --models nat,adv,nat_and_adv,weak_adv \
+    --samples_per_class 10
 ```
 
-出力: `docs/common_correct_indices_mnist_n100.json`
+出力：`docs/common_correct_indices_mnist_n100.json`（出力先は `--out_dir` で変更可能，デフォルトは `docs`）
+
+> `docs/` は `.gitignore` 対象のため，このファイルはリポジトリに含まれていません．
+> `--common_indices_file` に指定する前に，上記コマンドでローカルに生成してください．
 
 ### 2. PGD 攻撃の実行
 
-`src/main.py` が全初期化手法を統一的に扱うメインエントリポイントです:
+`src/main.py` が全初期化手法を統一的に扱うメインエントリポイントです：
 
 ```bash
 python src/main.py \
@@ -158,12 +174,12 @@ python src/main.py \
 
 #### 初期化手法の選択
 
-| `--init` | 説明 |
-|---|---|
-| `random` | L-inf ボール内のランダム初期化（デフォルト） |
-| `deepfool` | DeepFool による最近接決定境界方向への初期化 |
+| `--init`         | 説明                                                 |
+| ---------------- | ---------------------------------------------------- |
+| `random`         | L-inf ボール内のランダム初期化（デフォルト）         |
+| `deepfool`       | DeepFool による最近接決定境界方向への初期化          |
 | `multi_deepfool` | 全ターゲットクラスへの DeepFool で多様な初期点を生成 |
-| `clean` | 元画像から開始（ベースライン比較用） |
+| `clean`          | 元画像から開始（ベースライン比較用）                 |
 
 #### DeepFool / Multi-DeepFool 固有オプション
 
@@ -196,21 +212,21 @@ python -m src.timing_cli \
 
 ```json
 {
-  "dataset": "mnist",
-  "model": "nat",
-  "init": "random",
-  "num_restarts": 1,
-  "indices": [3, 17, 42],
-  "results": [
-    {"init": 0.001, "pgd": 0.523, "total": 0.524},
-    {"init": 0.001, "pgd": 0.518, "total": 0.519}
-  ]
+    "dataset": "mnist",
+    "model": "nat",
+    "init": "random",
+    "num_restarts": 1,
+    "indices": [3, 17, 42],
+    "results": [
+        { "init": 0.001, "pgd": 0.523, "total": 0.524 },
+        { "init": 0.001, "pgd": 0.518, "total": 0.519 }
+    ]
 }
 ```
 
 ### 4. バッチ実行
 
-全モデル・全初期化手法をまとめて実行:
+全モデル・全初期化手法をまとめて実行：
 
 ```bash
 # PGD 攻撃（全組み合わせ）
@@ -258,7 +274,7 @@ TF 1.15 は AVX 命令を必要とし，ARM エミュレーション環境では
 `tests/conftest.py` が `/proc/cpuinfo` の AVX フラグを検出し，
 TF を安全にインポートできない環境では `@pytest.mark.requires_tf` 付きテストを自動スキップします．
 
-環境変数 `SKIP_TF_TESTS=1` で強制スキップも可能です:
+環境変数 `SKIP_TF_TESTS=1` で強制スキップも可能です：
 
 ```bash
 SKIP_TF_TESTS=1 pytest tests/ -v
@@ -266,31 +282,31 @@ SKIP_TF_TESTS=1 pytest tests/ -v
 
 ### テストファイル一覧
 
-| テストファイル | 対象モジュール | TF 依存 |
-|---|---|---|
-| `test_dto.py` | `src/dto.py` — データ転送オブジェクト | No |
-| `test_math_utils.py` | `src/math_utils.py` — 数学ユーティリティ | No |
-| `test_cli.py` | `src/cli.py` — CLI 引数パース | No |
-| `test_dataset_config.py` | `src/dataset_config.py` — データセット設定 | No |
-| `test_logging_config.py` | `src/logging_config.py` — ロギング設定 | No |
-| `test_pgd.py` | `src/pgd.py` — PGD 攻撃（NumPy 部分） | No |
-| `test_multi_deepfool.py` | `src/multi_deepfool.py` — 摂動計算（NumPy）+ 統合テスト | 一部 |
-| `test_pipeline.py` | `src/pipeline.py` — パイプライン制御 | No (mock) |
-| `test_plot_setup.py` | `src/plot_setup.py` — 可視化設定 | No |
-| `test_plot_save.py` | `src/plot_save.py` — 可視化保存 | No (mock) |
-| `test_timing.py` | `src/timing.py` — タイミング計測コードパス | No (mock) |
-| `test_timing_cli.py` | `src/timing_cli.py` — タイミング計測 CLI | No (mock) |
-| `test_analyze_misclassification.py` | `analyze_misclassification.py` — 誤分類分析 | No |
-| `test_analyze_timing.py` | `analyze_timing.py` — タイミング分析 | No |
-| `test_find_common_correct_samples.py` | `find_common_correct_samples.py` | No |
-| `test_run_all_script.py` | `run_all_ex100.sh` — バッチスクリプト構文検証 | No |
-| `test_batch_scripts.py` | `run_timing_ex100.sh` — バッチスクリプト構文検証 | No |
-| `test_legacy_removal.py` | レガシーファイル削除の検証 | No |
-| `test_conftest.py` | `conftest.py` — TF スキップ機構の検証 | 一部 |
+| テストファイル                        | 対象モジュール                                          | TF 依存   |
+| ------------------------------------- | ------------------------------------------------------- | --------- |
+| `test_dto.py`                         | `src/dto.py` — データ転送オブジェクト                   | No        |
+| `test_math_utils.py`                  | `src/math_utils.py` — 数学ユーティリティ                | No        |
+| `test_cli.py`                         | `src/cli.py` — CLI 引数パース                           | No        |
+| `test_dataset_config.py`              | `src/dataset_config.py` — データセット設定              | No        |
+| `test_logging_config.py`              | `src/logging_config.py` — ロギング設定                  | No        |
+| `test_pgd.py`                         | `src/pgd.py` — PGD 攻撃（NumPy 部分）                   | No        |
+| `test_multi_deepfool.py`              | `src/multi_deepfool.py` — 摂動計算（NumPy）+ 統合テスト | 一部      |
+| `test_pipeline.py`                    | `src/pipeline.py` — パイプライン制御                    | No (mock) |
+| `test_plot_setup.py`                  | `src/plot_setup.py` — 可視化設定                        | No        |
+| `test_plot_save.py`                   | `src/plot_save.py` — 可視化保存                         | No (mock) |
+| `test_timing.py`                      | `src/timing.py` — タイミング計測コードパス              | No (mock) |
+| `test_timing_cli.py`                  | `src/timing_cli.py` — タイミング計測 CLI                | No (mock) |
+| `test_analyze_misclassification.py`   | `analyze_misclassification.py` — 誤分類分析             | No        |
+| `test_analyze_timing.py`              | `analyze_timing.py` — タイミング分析                    | No        |
+| `test_find_common_correct_samples.py` | `find_common_correct_samples.py`                        | No        |
+| `test_run_all_script.py`              | `run_all_ex100.sh` — バッチスクリプト構文検証           | No        |
+| `test_batch_scripts.py`               | `run_timing_ex100.sh` — バッチスクリプト構文検証        | No        |
+| `test_legacy_removal.py`              | レガシーファイル削除の検証                              | No        |
+| `test_conftest.py`                    | `conftest.py` — TF スキップ機構の検証                   | 一部      |
 
 ## Output Format
 
-実験結果は以下のディレクトリ構造で出力されます:
+実験結果は以下のディレクトリ構造で出力されます：
 
 ```
 outputs/{exp_name}/{dataset}/{model}/{init}/
@@ -301,11 +317,11 @@ outputs/{exp_name}/{dataset}/{model}/{init}/
 
 ## Supported Datasets
 
-| Dataset | Epsilon | Alpha | Classes |
-|---|---|---|---|
-| MNIST | 0.3 | 0.01 | 10 |
-| CIFAR-10 | 8/255 | 2/255 | 10 |
+| Dataset  | Epsilon | Alpha | Classes |
+| -------- | ------- | ----- | ------- |
+| MNIST    | 0.3     | 0.01  | 10      |
+| CIFAR-10 | 8/255   | 2/255 | 10      |
 
 ## License
 
-Kyushu University - Thesis Research Project
+This project is licensed under the [MIT License](LICENSE).
